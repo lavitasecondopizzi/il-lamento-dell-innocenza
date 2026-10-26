@@ -117,7 +117,7 @@ const SPELLS = {
 const BUILDER_STEPS = ["Identità", "Background", "Lancio dei dadi", "Caratteristiche", "Abilità", "Magie", "Riepilogo"];
 const builder = {
   step: 0, name: "Il Viandante", classId: "guerriero", ancestry: "umano", background: "forestiero", mode: "standard",
-  rolls: STANDARD_ARRAY.map(score => ({ score })), assignment: getDefaultAssignment("guerriero"), skills: [], spells: []
+  rolls: [], statValues: Object.fromEntries(ABILITIES.map(key => [key, 8])), remainingPoints: 0, skills: [], spells: []
 };
 function getBuilderStats() {
   const ancestry = ANCESTRIES[builder.ancestry] || ANCESTRIES.umano;
