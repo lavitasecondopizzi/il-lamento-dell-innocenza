@@ -50,6 +50,8 @@ I test controllano la scena iniziale, i testi delle scene, i riferimenti narrati
 - Bonus di discendenza e modificatori derivati ricalcolati automaticamente.
 - Competenze di classe/background e selezione di magie iniziali per mago e chierico.
 - Punti vita, classe armatura, prove e combattimento collegati alle caratteristiche.
+- Progressione nascosta fino al livello 10: esperienza non mostrata nell'interfaccia, assegnata per scelte, tentativi e successi nelle prove, scoperte, vittorie e fughe.
+- Premi unici per evento, per evitare di ottenere progressi ripetendo la stessa azione; i livelli aumentano PF e bonus di competenza alle soglie previste.
 - Scelte narrative con requisiti ed effetti.
 - Prove d20 e un combattimento dimostrativo.
 - Diario, inventario e scheda.
@@ -62,7 +64,8 @@ I test controllano la scena iniziale, i testi delle scene, i riferimenti narrati
 - La modalità permadeath è una protezione applicativa locale, non anti-manomissione: cancellare i dati del browser può azzerare lo stato.
 - I salvataggi non si sincronizzano tra dispositivi.
 - Il sistema di combattimento e il bilanciamento sono dimostrativi e richiedono test.
-- Alcune regole avanzate del GdR (progressione completa, magia, condizioni, checkpoint con recupero da errori tecnici) non sono ancora implementate.
+- Il sistema di progressione è una prima implementazione e richiederà bilanciamento con avventure più lunghe; le magie selezionate non hanno ancora tutte effetti attivi in gioco.
+- Alcune regole avanzate del GdR (magia completa, condizioni, checkpoint con recupero da errori tecnici) non sono ancora implementate.
 - Le font esterne migliorano l'aspetto, ma richiedono una connessione; il gioco non dipende da esse per le regole.
 
 ## Licenza
