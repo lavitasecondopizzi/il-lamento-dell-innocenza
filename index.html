@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#171512">
+  <meta name="description" content="Il lamento dell'innocenza — un libro-game fantasy dark in sviluppo.">
+  <title>Il lamento dell'innocenza</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=IM+Fell+English:ital@0;1&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css">
+  <script src="./src/main.js" defer></script>
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+  <header class="topbar">
+    <a class="brand" href="./" aria-label="Il lamento dell'innocenza, home">
+      <span class="brand-mark">✦</span>
+      <span>IL LAMENTO <small>DELL'INNOCENZA</small></span>
+    </a>
+    <div class="topbar-actions">
+      <span class="build-label">PROTOTIPO NARRATIVO</span>
+      <button id="menu-button" class="icon-button" aria-label="Apri menu" title="Menu">☰</button>
+    </div>
+  </header>
+
+  <main id="app" class="app-shell">
+    <section id="title-screen" class="title-screen">
+      <div class="title-art" aria-hidden="true">
+        <div class="moon"></div>
+        <div class="spire spire-one"></div>
+        <div class="spire spire-two"></div>
+        <div class="engraving-lines"></div>
+        <div class="art-caption">MEMENTO · VERITAS · UMBRA</div>
+      </div>
+      <div class="title-copy">
+        <p class="eyebrow">UN LIBRO-GAME FANTASY</p>
+        <h1>Il lamento<br><em>dell'innocenza</em></h1>
+        <p class="title-intro">Ogni scelta lascia una traccia.<br>Non tutte le verità desiderano essere trovate.</p>
+        <div class="title-rule"><span>✦</span></div>
+        <p class="prototype-note">Questa versione contiene una breve avventura dimostrativa, separata dalla storia ufficiale.</p>
+        <div class="title-actions">
+          <button id="new-game-button" class="primary-button">Inizia una partita <span>↗</span></button>
+          <button id="continue-button" class="secondary-button">Continua</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="character-screen" class="panel hidden" aria-labelledby="character-heading">
+      <div class="section-heading">
+        <p class="eyebrow">PRIMA DI COMINCIARE</p>
+        <h2 id="character-heading">Il tuo personaggio</h2>
+        <p>Questa scheda serve a collaudare il sistema. La storia mostrata è provvisoria.</p>
+      </div>
+      <form id="character-form">
+        <label class="field-label" for="hero-name">Nome del personaggio</label>
+        <input id="hero-name" name="heroName" maxlength="32" value="Il Viandante" required>
+        <fieldset class="class-picker">
+          <legend>Classe</legend>
+          <div class="class-grid">
+            <label class="class-card"><input type="radio" name="heroClass" value="guerriero" checked><span class="class-icon">⚔</span><strong>Guerriero</strong><small>Resistenza e mischia</small></label>
+            <label class="class-card"><input type="radio" name="heroClass" value="mago"><span class="class-icon">✧</span><strong>Mago</strong><small>Conoscenza arcana</small></label>
+            <label class="class-card"><input type="radio" name="heroClass" value="ladro"><span class="class-icon">⌁</span><strong>Ladro</strong><small>Furtività e astuzia</small></label>
+            <label class="class-card"><input type="radio" name="heroClass" value="chierico"><span class="class-icon">✚</span><strong>Chierico</strong><small>Fede e protezione</small></label>
+          </div>
+        </fieldset>
+        <fieldset class="save-picker">
+          <legend>Modalità di partita</legend>
+          <label class="radio-line"><input type="radio" name="saveMode" value="standard" checked><span><strong>Libera</strong><small>Tre slot manuali e autosalvataggio. Puoi ricaricare una partita precedente.</small></span></label>
+          <label class="radio-line"><input type="radio" name="saveMode" value="permadeath"><span><strong>Permadeath</strong><small>Salvataggio automatico. La morte conclude la partita; niente caricamento libero.</small></span></label>
+        </fieldset>
+        <div class="form-actions">
+          <button type="button" id="back-title" class="secondary-button">Indietro</button>
+          <button type="submit" class="primary-button">Comincia il viaggio <span>↗</span></button>
+        </div>
+      </form>
+    </section>
+
+    <section id="game-screen" class="game-layout hidden">
+      <aside class="sidebar">
+        <div class="sidebar-top">
+          <p class="eyebrow">IL VIANDANTE</p>
+          <h2 id="sidebar-hero-name">Il Viandante</h2>
+          <p id="sidebar-class" class="muted">Guerriero · Livello 1</p>
+        </div>
+        <div class="resource-block">
+          <div class="resource-label"><span>Punti vita</span><strong id="hp-value">12 / 12</strong></div>
+          <div class="meter hp-meter"><span id="hp-meter-fill"></span></div>
+          <div class="resource-label lucid-label"><span>Lucidità</span><strong id="lucidity-value">100 / 100</strong></div>
+          <div class="meter lucidity-meter"><span id="lucidity-meter-fill"></span></div>
+        </div>
+        <div class="side-section">
+          <div class="side-heading">CARATTERISTICHE</div>
+          <div id="stats-list" class="stats-list"></div>
+        </div>
+        <nav class="side-nav" aria-label="Strumenti di gioco">
+          <button data-tab="journal" class="side-nav-button active">▤ <span>Diario</span></button>
+          <button data-tab="inventory" class="side-nav-button">◇ <span>Inventario</span></button>
+          <button data-tab="character" class="side-nav-button">♙ <span>Scheda</span></button>
+          <button data-tab="save" class="side-nav-button">▣ <span>Salvataggi</span></button>
+        </nav>
+        <div class="sidebar-footer"><span class="status-dot"></span><span id="save-status">Partita non salvata</span></div>
+      </aside>
+
+      <section class="reading-column">
+        <div class="chapter-bar">
+          <span id="chapter-label">AVVENTURA DIMOSTRATIVA</span>
+          <span id="scene-number">SCENA 01</span>
+        </div>
+        <article class="story-card">
+          <div class="story-ornament" aria-hidden="true">✦ ───────── ✦</div>
+          <p id="scene-kicker" class="eyebrow">IL CUSTODE DEL PONTE</p>
+          <h1 id="scene-title">Il ponte nella nebbia</h1>
+          <div id="scene-art" class="scene-art" aria-hidden="true">
+            <div class="scene-moon"></div><div class="scene-bridge"></div><div class="scene-tower"></div>
+          </div>
+          <div id="scene-text" class="story-text"></div>
+          <div id="scene-extra" class="scene-extra hidden"></div>
+          <div id="choices" class="choices"></div>
+          <div id="combat-panel" class="combat-panel hidden"></div>
+          <div class="story-footnote"><span>✦</span> La dimostrazione non fa parte della storia ufficiale.</div>
+        </article>
+        <div id="tab-panel" class="tab-panel hidden"></div>
+      </section>
+    </section>
+
+    <section id="ending-screen" class="ending-screen hidden">
+      <p class="eyebrow">AVVENTURA DIMOSTRATIVA · CONCLUSA</p>
+      <h2 id="ending-title">Il ponte è alle tue spalle</h2>
+      <p id="ending-text"></p>
+      <div class="ending-actions"><button id="restart-button" class="primary-button">Nuova partita</button><button id="title-button" class="secondary-button">Torna al titolo</button></div>
+    </section>
+    <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+  </main>
+  <footer class="site-footer"><span>IL LAMENTO DELL'INNOCENZA</span><span>PROTOTIPO · VERSIONE 0.1</span></footer>
+  <dialog id="menu-dialog" class="menu-dialog">
+    <div class="dialog-header"><h2>Menu</h2><button id="close-menu" class="icon-button" aria-label="Chiudi menu">×</button></div>
+    <button id="menu-save" class="dialog-action">Salva partita</button>
+    <button id="menu-title" class="dialog-action">Torna al titolo</button>
+    <p class="dialog-note">La trama dimostrativa è temporanea e verrà sostituita dai tuoi contenuti.</p>
+  </dialog>
+</body>
+</html>

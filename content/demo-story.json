@@ -1,0 +1,205 @@
+{
+  "start": "bridge_01",
+  "enemies": {
+    "bridge_guard": {
+      "name": "Guardiano del ponte",
+      "description": "Un uomo in armatura ammaccata alza la lancia. Non sembra intenzionato a lasciarti passare.",
+      "hp": 8,
+      "ac": 12,
+      "attack": 3,
+      "damage": 3,
+      "escapeScene": "bridge_ending_escape",
+      "victoryScene": "bridge_ending_fight",
+      "victoryEffects": [
+        {
+          "type": "set_flag",
+          "key": "guard_defeated",
+          "value": true
+        },
+        {
+          "type": "add_item",
+          "item": "Sigillo di rame"
+        },
+        {
+          "type": "journal",
+          "text": "Hai ottenuto un sigillo di rame dal guardiano."
+        }
+      ]
+    }
+  },
+  "scenes": {
+    "bridge_01": {
+      "title": "Il ponte nella nebbia",
+      "kicker": "IL CUSTODE DEL PONTE",
+      "chapterLabel": "AVVENTURA DIMOSTRATIVA",
+      "text": [
+        "La strada termina davanti a un vecchio ponte di pietra. La nebbia sale dal fiume e avvolge le arcate come un sudario.",
+        "Un mercante stringe il mantello al petto. Accanto a lui, una guardia tiene la lancia puntata verso uno sconosciuto.",
+        "«Mi ha derubato», insiste il mercante. Lo sconosciuto non risponde. La guardia si volta verso di te: «Viandante, hai visto qualcosa?»"
+      ],
+      "choices": [
+        {
+          "text": "Parla con il mercante e cerca di capire cosa sia accaduto.",
+          "next": "bridge_02"
+        },
+        {
+          "text": "Esamina il terreno e cerca tracce prima di giudicare.",
+          "type": "check",
+          "stat": "saggezza",
+          "dc": 12,
+          "success": {
+            "next": "bridge_03",
+            "effects": [
+              {
+                "type": "set_flag",
+                "key": "found_footprints",
+                "value": true
+              },
+              {
+                "type": "add_item",
+                "item": "Fibra di mantello scuro"
+              },
+              {
+                "type": "journal",
+                "text": "Hai trovato impronte che non corrispondono agli stivali dello sconosciuto."
+              }
+            ]
+          },
+          "failure": {
+            "next": "bridge_02",
+            "effects": [
+              {
+                "type": "journal",
+                "text": "La nebbia e il terreno bagnato rendono difficile distinguere le tracce."
+              }
+            ]
+          }
+        },
+        {
+          "text": "Chiedi alla guardia di lasciarti passare e preparati a difenderti.",
+          "type": "combat",
+          "enemy": "bridge_guard"
+        }
+      ]
+    },
+    "bridge_02": {
+      "title": "Due versioni",
+      "kicker": "UNA STORIA CONTRADDITTORIA",
+      "text": [
+        "Il mercante racconta che il ladro gli è comparso alle spalle. Lo sconosciuto, finalmente, alza gli occhi: «Non l'ho mai visto prima»",
+        "Le due versioni non coincidono. Nessuno dei presenti sembra disposto a cedere."
+      ],
+      "choices": [
+        {
+          "text": "Chiedi alla guardia di mostrarti il luogo del presunto furto.",
+          "next": "bridge_03"
+        },
+        {
+          "text": "Accusi lo sconosciuto e chiedi alla guardia di arrestarlo.",
+          "next": "bridge_ending_accuse",
+          "effects": [
+            {
+              "type": "set_flag",
+              "key": "accused_stranger",
+              "value": true
+            },
+            {
+              "type": "journal",
+              "text": "Hai accusato lo sconosciuto senza una prova certa."
+            }
+          ]
+        },
+        {
+          "text": "Ti rifiuti di prendere posizione e attraversi il ponte.",
+          "next": "bridge_ending_escape",
+          "effects": [
+            {
+              "type": "set_flag",
+              "key": "avoided_conflict",
+              "value": true
+            }
+          ]
+        }
+      ]
+    },
+    "bridge_03": {
+      "title": "Le impronte",
+      "kicker": "UN DETTAGLIO FUORI POSTO",
+      "text": [
+        "Sul fango, oltre il parapetto, noti impronte profonde che si allontanano dal mercante. La fibra scura rimasta tra due pietre sembra provenire da un mantello strappato.",
+        "Quando mostri il ritrovamento alla guardia, il mercante smette di parlare. Per un istante, il suo sguardo scivola verso il fiume."
+      ],
+      "note": "Indizio registrato: la scena del furto potrebbe essere stata simulata.",
+      "choices": [
+        {
+          "text": "Mostra gli indizi alla guardia e chiedi che il mercante venga interrogato.",
+          "next": "bridge_ending_truth",
+          "requirements": [
+            {
+              "type": "flag",
+              "key": "found_footprints",
+              "value": true
+            }
+          ],
+          "effects": [
+            {
+              "type": "set_flag",
+              "key": "presented_evidence",
+              "value": true
+            },
+            {
+              "type": "journal",
+              "text": "Hai presentato gli indizi alla guardia."
+            }
+          ]
+        },
+        {
+          "text": "Affronta direttamente il mercante.",
+          "next": "bridge_ending_accuse",
+          "effects": [
+            {
+              "type": "set_flag",
+              "key": "confronted_merchant",
+              "value": true
+            }
+          ]
+        },
+        {
+          "text": "Approfitta della confusione e attraversa il ponte.",
+          "next": "bridge_ending_escape",
+          "effects": [
+            {
+              "type": "set_flag",
+              "key": "avoided_conflict",
+              "value": true
+            }
+          ]
+        }
+      ]
+    },
+    "bridge_ending_truth": {
+      "title": "Il peso della prova",
+      "kicker": "CONCLUSIONE",
+      "ending": true,
+      "text": "La guardia esamina le impronte e la fibra. Il mercante perde sicurezza e viene condotto alla torre per essere interrogato. Non hai risolto ogni mistero, ma hai impedito che una decisione precipitosa diventasse una condanna. La strada oltre il ponte è aperta."
+    },
+    "bridge_ending_accuse": {
+      "title": "Una decisione affrettata",
+      "kicker": "CONCLUSIONE",
+      "ending": true,
+      "text": "La guardia prende una decisione, ma nessuno sembra davvero convinto di aver scoperto la verità. Attraversi il ponte con la sensazione di aver lasciato qualcosa d'importante alle tue spalle."
+    },
+    "bridge_ending_escape": {
+      "title": "La strada continua",
+      "kicker": "CONCLUSIONE",
+      "ending": true,
+      "text": "Ti allontani dal ponte mentre le voci si perdono nella nebbia. Non sai chi dicesse la verità. Per ora, hai scelto di non rischiare la vita per scoprirlo."
+    },
+    "bridge_ending_fight": {
+      "title": "Il ponte è libero",
+      "kicker": "CONCLUSIONE",
+      "ending": true,
+      "text": "Il guardiano cade in ginocchio e lascia cadere un sigillo di rame. Il ponte è libero, ma il rumore dello scontro ha richiamato l'attenzione della torre. Prosegui prima che arrivino altri uomini."
+    }
+  }
+}
