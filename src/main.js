@@ -6,7 +6,8 @@ const CLASS_DATA = {
   guerriero: { label: "Guerriero", hp: 12, stat: "forza", bonus: 2, items: ["Spada consumata", "Benda pulita"] },
   mago: { label: "Mago", hp: 6, stat: "intelligenza", bonus: 2, items: ["Bastone nodoso", "Appunti arcani"] },
   ladro: { label: "Ladro", hp: 8, stat: "destrezza", bonus: 2, items: ["Pugnale", "Attrezzi da scasso"] },
-  chierico: { label: "Chierico", hp: 10, stat: "saggezza", bonus: 2, items: ["Mazza semplice", "Simbolo sacro"] }
+  chierico: { label: "Chierico", hp: 10, stat: "saggezza", bonus: 2, items: ["Mazza semplice", "Simbolo sacro"] },
+  bardo: { label: "Bardo", hp: 8, stat: "carisma", bonus: 2, items: ["Liuto da viaggio", "Pugnale", "Libro di canzoni"] }
 };
 const STANDARD_ARRAY = [15, 14, 13, 12, 10, 8];
 const STAT_NAMES = { forza: "Forza", destrezza: "Destrezza", costituzione: "Costituzione", intelligenza: "Intelligenza", saggezza: "Saggezza", carisma: "Carisma" };
@@ -46,11 +47,16 @@ function getStatsForClass(classId) {
     guerriero: ["forza","costituzione","destrezza","saggezza","carisma","intelligenza"],
     mago: ["intelligenza","destrezza","costituzione","saggezza","carisma","forza"],
     ladro: ["destrezza","intelligenza","carisma","costituzione","saggezza","forza"],
-    chierico: ["saggezza","costituzione","forza","carisma","destrezza","intelligenza"]
-  }[classId];
+    chierico: ["saggezza","costituzione","forza","carisma","destrezza","intelligenza"],
+    bardo: ["carisma","destrezza","costituzione","intelligenza","saggezza","forza"]
+  }[classId] || ["forza","costituzione","destrezza","saggezza","carisma","intelligenza"];
   const result = {};
   classPriority.forEach((stat, index) => result[stat] = STANDARD_ARRAY[index]);
   return Object.fromEntries(order.map(stat => [stat, result[stat]]));
+}
+function getDefaultAssignment(classId) {
+  const stats = getStatsForClass(classId);
+  return Object.fromEntries(ABILITIES.map(key => [key, STANDARD_ARRAY.indexOf(stats[key])]));
 }
 
 const ABILITIES = ["forza", "destrezza", "costituzione", "intelligenza", "saggezza", "carisma"];
@@ -85,7 +91,8 @@ const CLASS_SKILLS = {
   guerriero: ["atletica", "intimidazione", "percezione", "sopravvivenza", "storia", "acrobazia"],
   mago: ["arcano", "storia", "investigazione", "medicina", "religione", "intuizione"],
   ladro: ["acrobazia", "atletica", "inganno", "investigazione", "percezione", "rapidita di mano", "furtivita", "intimidazione"],
-  chierico: ["medicina", "intuizione", "religione", "persuasione", "storia"]
+  chierico: ["medicina", "intuizione", "religione", "persuasione", "storia"],
+  bardo: ["intrattenere", "persuasione", "inganno", "intuizione", "storia", "acrobazia", "rapidita di mano", "investigazione"]
 };
 const SPELLS = {
   mago: [
@@ -99,20 +106,19 @@ const SPELLS = {
     { id: "fiamma_sacra", name: "Fiamma sacra", description: "Una scintilla sacra colpisce un avversario." },
     { id: "protezione", name: "Velo protettivo", description: "Una preghiera attenua il prossimo colpo." },
     { id: "guida", name: "Guida", description: "Una benedizione aiuta una prova di abilità." }
+  ],
+  bardo: [
+    { id: "nota_tagliente", name: "Nota tagliente", description: "Una nota magica ferisce e distrae un avversario." },
+    { id: "parola_rassicurante", name: "Parola rassicurante", description: "Una frase ispirata sostiene un alleato." },
+    { id: "illusione_minore", name: "Illusione minore", description: "Crei un piccolo suono o un’immagine illusoria." },
+    { id: "cura_melodica", name: "Cura melodica", description: "Una breve melodia ristora le forze." }
   ]
 };
-const BUILDER_STEPS = ["Identità", "Lancio dei dadi", "Caratteristiche", "Abilità", "Magie", "Riepilogo"];
+const BUILDER_STEPS = ["Identità", "Array standard", "Caratteristiche", "Abilità", "Magie", "Riepilogo"];
 const builder = {
   step: 0, name: "Il Viandante", classId: "guerriero", ancestry: "umano", background: "forestiero", mode: "standard",
-  rolls: [], assignment: {}, skills: [], spells: []
+  rolls: STANDARD_ARRAY.map(score => ({ score })), assignment: getDefaultAssignment("guerriero"), skills: [], spells: []
 };
-function rollAbilityScores() {
-  return Array.from({ length: 6 }, () => {
-    const dice = Array.from({ length: 4 }, () => 1 + Math.floor(Math.random() * 6));
-    const dropped = Math.min(...dice);
-    return { dice, dropped, score: dice.reduce((sum, die) => sum + die, 0) - dropped };
-  });
-}
 function getBuilderStats() {
   const ancestry = ANCESTRIES[builder.ancestry] || ANCESTRIES.umano;
   const base = {};
@@ -123,7 +129,7 @@ function getBuilderStats() {
   });
   return base;
 }
-function isCaster() { return ["mago", "chierico"].includes(builder.classId); }
+function isCaster() { return ["mago", "chierico", "bardo"].includes(builder.classId); }
 function builderSheetMarkup() {
   const stats = getBuilderStats();
   const name = safeText(builder.name.trim() || "Il Viandante");
@@ -154,8 +160,7 @@ function renderBuilder() {
       <label class="field-label">Modalità di partita<select id="builder-mode"><option value="standard" ${builder.mode==="standard"?"selected":""}>Libera</option><option value="permadeath" ${builder.mode==="permadeath"?"selected":""}>Permadeath</option></select></label></div>
       <p class="wizard-note">Classe, discendenza e background modificano la scheda, l'equipaggiamento e le abilità disponibili.</p></div>`;
   } else if (step === 1) {
-    content = `<div class="wizard-step"><p class="eyebrow">PASSO 2 DI 6</p><h3>Determina le caratteristiche</h3><p>Per ogni caratteristica lancia 4d6 e scarta il dado più basso. I sei risultati ottenuti saranno poi distribuiti liberamente.</p><button type="button" class="secondary-button" id="roll-abilities">Lancia i dadi (4d6, scarta il minore)</button>
-      ${builder.rolls.length ? `<div class="dice-results">${builder.rolls.map((roll,index)=>`<div class="dice-result"><strong>Risultato ${index+1}: ${roll.score}</strong><span>Dadi: ${roll.dice.map((die,i)=>i===roll.dice.indexOf(roll.dropped)?"":"").length ? roll.dice.map((die,i)=>`<i class="${die===roll.dropped && roll.dice.indexOf(die)===i?"dropped-die":""}">${die}</i>`).join(" ") : ""}</span><small>Scartato: ${roll.dropped}</small></div>`).join("")}</div><p class="wizard-note">Puoi rilanciare prima di proseguire. Una volta confermati, i risultati restano quelli della partita.</p>` : `<p class="wizard-note">Non hai ancora lanciato i dadi.</p>`}</div>`;
+    content = `<div class="wizard-step"><p class="eyebrow">PASSO 2 DI 6</p><h3>Array standard</h3><p>Usa i sei valori previsti dal regolamento: <strong>15, 14, 13, 12, 10, 8</strong>. Sono già distribuiti secondo le caratteristiche più utili alla classe scelta, ma puoi riassegnarli nel passaggio successivo.</p><div class="dice-results">${builder.rolls.map((roll,index)=>`<div class="dice-result"><strong>Valore ${index+1}</strong><span>${roll.score}</span></div>`).join("")}</div></div>`;
   } else if (step === 2) {
     const used = Object.values(builder.assignment).filter(Number.isInteger);
     content = `<div class="wizard-step"><p class="eyebrow">PASSO 3 DI 6</p><h3>Distribuisci i risultati</h3><p>Assegna un risultato diverso a ciascuna caratteristica. I bonus della discendenza si applicano automaticamente; i modificatori sono calcolati in tempo reale.</p><div class="ability-assignment">${ABILITIES.map(key=>`<label><span>${STAT_NAMES[key]}</span><select data-ability="${key}"><option value="">Scegli un risultato</option>${builder.rolls.map((roll,index)=>`<option value="${index}" ${builder.assignment[key]===index?"selected":""} ${used.includes(index)&&builder.assignment[key]!==index?"disabled":""}>Risultato ${index+1}: ${roll.score}</option>`).join("")}</select><strong>${getBuilderStats()[key]} (${signed(modifier(getBuilderStats()[key]))})</strong></label>`).join("")}</div></div>`;
@@ -173,7 +178,7 @@ function renderBuilder() {
   form.innerHTML = `<div class="wizard-layout"><div class="wizard-main">${content}<div class="wizard-navigation"><button type="button" id="builder-back" class="secondary-button" ${step===0?"disabled":""}>Indietro</button>${step<5?`<button type="button" id="builder-next" class="primary-button">${step===4?"Riepilogo":"Continua"} <span>↗</span></button>`:`<button type="submit" class="primary-button">Comincia il viaggio <span>↗</span></button>`}</div></div><aside class="live-character-sheet">${builderSheetMarkup()}</aside></div>`;
 }
 function builderValidationMessage() {
-  if (builder.step === 1 && builder.rolls.length !== 6) return "Lancia i dadi prima di proseguire.";
+  if (builder.step === 1 && builder.rolls.length !== 6) return "I valori dell’array standard non sono disponibili.";
   if (builder.step === 2 && (Object.keys(builder.assignment).length !== 6 || new Set(Object.values(builder.assignment)).size !== 6)) return "Assegna tutti e sei i risultati senza ripeterli.";
   if (builder.step === 3 && builder.skills.length !== 2) return "Scegli esattamente due abilità.";
   if (builder.step === 4 && isCaster() && builder.spells.length !== 2) return "Scegli esattamente due magie iniziali.";
@@ -185,6 +190,7 @@ function handleBuilderChange(event) {
   if (target.id === "builder-ancestry") builder.ancestry = target.value;
   if (target.id === "builder-class") {
     builder.classId = target.value;
+    builder.assignment = getDefaultAssignment(builder.classId);
     builder.skills = [];
     builder.spells = [];
   }
@@ -592,11 +598,6 @@ async function init() {
     }
   });
   el.form.addEventListener("click", event => {
-    if (event.target.closest("#roll-abilities")) {
-      builder.rolls = rollAbilityScores();
-      builder.assignment = {};
-      renderBuilder();
-    }
     if (event.target.closest("#builder-back")) {
       builder.step = Math.max(0, builder.step - 1);
       renderBuilder();
