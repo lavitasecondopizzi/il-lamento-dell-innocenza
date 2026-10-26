@@ -3,7 +3,7 @@
 :root{
   color-scheme:dark;
   --night:#17120f;--night-soft:#211914;--wood:#2b2019;--wood-light:#39291f;
-  --paper:#f0e5cd;--paper-aged:#e2d1ae;--paper-shadow:#c4ad86;--ink:#30241c;
+  --paper:#f0e5cd;--paper-aged:#e2d1ae;--paper-shadow:#c4ad86;--paper-dim:#c6b79c;--ink:#30241c;
   --ink-soft:#594637;--muted:#b4a28a;--gold:#c9a66c;--gold-light:#e5cb94;
   --wine:#773c3b;--wine-bright:#a85b50;--sage:#899578;--line:#69523b;
   --serif:'Cormorant Garamond',Georgia,serif;--display:'IM Fell English',Georgia,serif;
