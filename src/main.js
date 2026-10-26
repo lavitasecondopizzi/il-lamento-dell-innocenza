@@ -52,7 +52,11 @@ function getStatsForClass(classId) {
   return Object.fromEntries(order.map(stat => [stat, result[stat]]));
 }
 function newGame(name, classId, mode) {
-  if (mode === "permadeath") localStorage.removeItem(saveKey("permadeath-dead"));
+  if (mode === "permadeath") {
+    try { localStorage.removeItem(saveKey("permadeath-dead")); } catch (error) {
+      console.warn("Impossibile azzerare il blocco permadeath nel browser.", error);
+    }
+  }
   const klass = CLASS_DATA[classId] || CLASS_DATA.guerriero;
   const stats = getStatsForClass(classId);
   const maxHp = klass.hp + modifier(stats.costituzione);
@@ -64,8 +68,9 @@ function newGame(name, classId, mode) {
   };
   combat = null;
   recordJournal("La dimostrazione ha avuto inizio.");
-  saveAutosave();
+  // Mostra subito la partita: un errore di storage non deve impedire l'avvio.
   renderGame();
+  saveAutosave();
 }
 function recordJournal(entry) {
   if (!state) return;
@@ -276,17 +281,23 @@ function showEnding(scene) {
 function saveKey(slot = "auto") { return `${SAVE_PREFIX}:${slot}`; }
 function saveAutosave(force = false) {
   if (!state) return;
-  if (state.mode === "permadeath" && state.dead) {
-    localStorage.setItem(saveKey("permadeath-dead"), JSON.stringify(state));
-    localStorage.removeItem(saveKey("permadeath-active"));
-  } else if (state.mode === "permadeath") {
-    localStorage.setItem(saveKey("permadeath-active"), JSON.stringify(state));
-  } else {
-    localStorage.setItem(saveKey("auto"), JSON.stringify(state));
-  }
   state.updatedAt = new Date().toISOString();
-  $("#save-status").textContent = "Salvataggio aggiornato";
-  if (force) $("#save-status").textContent = "Partita conclusa";
+  try {
+    if (state.mode === "permadeath" && state.dead) {
+      localStorage.setItem(saveKey("permadeath-dead"), JSON.stringify(state));
+      localStorage.removeItem(saveKey("permadeath-active"));
+    } else if (state.mode === "permadeath") {
+      localStorage.setItem(saveKey("permadeath-active"), JSON.stringify(state));
+    } else {
+      localStorage.setItem(saveKey("auto"), JSON.stringify(state));
+    }
+    $("#save-status").textContent = force ? "Partita conclusa" : "Salvataggio aggiornato";
+  } catch (error) {
+    console.warn("Salvataggio locale non disponibile.", error);
+    const status = $("#save-status");
+    if (status) status.textContent = "Salvataggio non disponibile";
+    toast("La partita è iniziata, ma il browser non consente di salvare. Puoi continuare a giocare in questa scheda.");
+  }
 }
 function saveManual(slot) {
   if (!state || state.mode === "permadeath") { toast("I salvataggi manuali non sono disponibili in permadeath."); return; }
@@ -357,8 +368,13 @@ async function init() {
   $("#back-title").addEventListener("click", backToTitle);
   $("#character-form").addEventListener("submit", event => {
     event.preventDefault();
-    const form = new FormData(el.form);
-    newGame(el.name.value, form.get("heroClass"), form.get("saveMode"));
+    try {
+      const form = new FormData(el.form);
+      newGame(el.name.value, form.get("heroClass") || "guerriero", form.get("saveMode") || "standard");
+    } catch (error) {
+      console.error("Errore durante l'avvio della partita:", error);
+      toast("Non è stato possibile avviare la partita. Ricarica la pagina e riprova.");
+    }
   });
   el.continue.addEventListener("click", () => {
     if (loadSave(saveKey("permadeath-active")) || loadSave(saveKey("auto"))) toast("Partita ripresa.");
