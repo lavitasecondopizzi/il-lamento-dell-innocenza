@@ -277,12 +277,17 @@ function goToScene(sceneId, effects = []) {
 function makeChoice(choice) {
   if (turnLock || !meetsRequirements(choice.requirements || [])) return;
   if (choice.type === "check") {
-    const stat = choice.stat || "saggezza";
+    const skillId = choice.skill;
+    const skill = skillId ? SKILLS[skillId] : null;
+    const stat = skill?.stat || choice.stat || "saggezza";
+    const trained = skillId ? (state.hero.skills || []).includes(skillId) : Boolean(choice.proficiency);
     const roll = rollD20();
-    const total = roll + modifier(state.hero.stats[stat]) + (choice.proficiency ? state.hero.proficiency : 0);
+    const bonus = modifier(state.hero.stats[stat]) + (trained ? state.hero.proficiency : 0);
+    const total = roll + bonus;
     const success = total >= choice.dc;
-    recordJournal(`Prova di ${STAT_NAMES[stat]}: d20 ${roll} ${signed(modifier(state.hero.stats[stat]))} = ${total}, CD ${choice.dc}: ${success ? "successo" : "fallimento"}.`);
-    toast(`Prova: ${roll} ${signed(modifier(state.hero.stats[stat]))} = ${total} · ${success ? "Successo" : "Fallimento"}`);
+    const testName = skill ? skill.label : STAT_NAMES[stat];
+    recordJournal(`Prova di ${testName}: d20 ${roll} ${signed(bonus)} = ${total}, CD ${choice.dc}: ${success ? "successo" : "fallimento"}.`);
+    toast(`Prova di ${testName}: ${roll} ${signed(bonus)} = ${total} · ${success ? "Successo" : "Fallimento"}`);
     const outcome = success ? choice.success : choice.failure;
     if (outcome) goToScene(outcome.next, outcome.effects || []);
     return;
