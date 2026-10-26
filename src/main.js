@@ -1,3 +1,4 @@
+import { createProgression, awardProgress, levelForExperience, LEVEL_THRESHOLDS } from "./progression.js";
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 const SAVE_PREFIX = "lamento-innocenza-v01";
@@ -219,8 +220,8 @@ function newGame(name, classId, mode, characterBuild = null) {
   const maxHp = klass.hp + modifier(stats.costituzione);
   state = {
     schemaVersion: 1, runId: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
-    hero: { name: name.trim() || "Il Viandante", classId, ancestry: characterBuild?.ancestry || "umano", background: characterBuild?.background || "forestiero", level: 1, xp: 0, stats, maxHp, hp: maxHp, armorClass: 10 + modifier(stats.destrezza), proficiency: 2, skills: characterBuild?.skills || [], spells: characterBuild?.spells || [] },
-    mode, sceneId: story.start, flags: {}, inventory: [...klass.items, ...(characterBuild?.equipment || []), "Una moneta annerita"], journal: [], visited: [],
+    hero: { name: name.trim() || "Il Viandante", classId, ancestry: characterBuild?.ancestry || "umano", background: characterBuild?.background || "forestiero", level: 1, stats, maxHp, hp: maxHp, armorClass: 10 + modifier(stats.destrezza), proficiency: 2, skills: characterBuild?.skills || [], spells: characterBuild?.spells || [] },
+    progression: createProgression(), mode, sceneId: story.start, flags: {}, inventory: [...klass.items, ...(characterBuild?.equipment || []), "Una moneta annerita"], journal: [], visited: [],
     lucidity: 100, combat: null, dead: false, ended: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
   };
   combat = null;
@@ -229,13 +230,57 @@ function newGame(name, classId, mode, characterBuild = null) {
   renderGame();
   saveAutosave();
 }
+
+function awardHiddenProgress(eventId, amount, category) {
+  if (!state) return;
+  if (!state.progression) state.progression = createProgression();
+  if (!Array.isArray(state.progression.rewardedEvents)) state.progression.rewardedEvents = [];
+  if (!state.progression.actions) state.progression.actions = createProgression().actions;
+  const result = awardProgress(state.progression, eventId, amount, category);
+  if (!result.awarded || result.newLevel <= result.oldLevel) return;
+  const hero = state.hero;
+  for (let level = result.oldLevel + 1; level <= result.newLevel; level++) {
+    const hitDie = CLASS_DATA[hero.classId]?.hp || 8;
+    const gain = Math.max(1, Math.floor(hitDie / 2) + 1 + modifier(hero.stats.costituzione));
+    hero.maxHp += gain;
+    hero.hp = Math.min(hero.maxHp, hero.hp + gain);
+  }
+  hero.level = result.newLevel;
+  hero.proficiency = result.newLevel >= 9 ? 4 : result.newLevel >= 5 ? 3 : 2;
+  hero.armorClass = 10 + modifier(hero.stats.destrezza);
+  recordJournal("Le tue esperienze ti hanno reso più forte. Nuove capacità si risvegliano in te.");
+  toast(`La tua esperienza ha dato frutto: sei salito al livello ${hero.level}.`);
+}
+function migrateProgression(save) {
+  if (!save.progression) save.progression = createProgression();
+  if (!Array.isArray(save.progression.rewardedEvents)) save.progression.rewardedEvents = [];
+  if (!save.progression.actions) save.progression.actions = createProgression().actions;
+  save.progression.experience = Math.max(0, Number(save.progression.experience) || 0);
+  const actualLevel = levelForExperience(save.progression.experience);
+  if (save.hero.level < actualLevel) {
+    const oldLevel = save.hero.level || 1;
+    for (let level = oldLevel + 1; level <= actualLevel; level++) {
+      const hitDie = CLASS_DATA[save.hero.classId]?.hp || 8;
+      const gain = Math.max(1, Math.floor(hitDie / 2) + 1 + modifier(save.hero.stats.costituzione));
+      save.hero.maxHp += gain;
+      save.hero.hp = Math.min(save.hero.maxHp, save.hero.hp + gain);
+    }
+    save.hero.level = actualLevel;
+  }
+  save.hero.proficiency = save.hero.level >= 9 ? 4 : save.hero.level >= 5 ? 3 : 2;
+}
+
 function recordJournal(entry) {
   if (!state) return;
   state.journal.push({ text: entry, at: new Date().toISOString(), sceneId: state.sceneId });
 }
 function applyEffects(effects = []) {
   for (const effect of effects) {
-    if (effect.type === "set_flag") state.flags[effect.key] = effect.value;
+    if (effect.type === "set_flag") {
+      const wasSet = state.flags[effect.key] === effect.value;
+      state.flags[effect.key] = effect.value;
+      if (!wasSet && effect.value === true) awardHiddenProgress(`discovery:${effect.key}`, 12, "discoveries");
+    }
     else if (effect.type === "add_item" && !state.inventory.includes(effect.item)) state.inventory.push(effect.item);
     else if (effect.type === "remove_item") {
       const index = state.inventory.indexOf(effect.item);
@@ -244,7 +289,7 @@ function applyEffects(effects = []) {
     else if (effect.type === "heal") state.hero.hp = Math.min(state.hero.maxHp, state.hero.hp + Number(effect.amount || 0));
     else if (effect.type === "damage") state.hero.hp = Math.max(0, state.hero.hp - Number(effect.amount || 0));
     else if (effect.type === "journal") recordJournal(effect.text);
-    else if (effect.type === "xp") state.hero.xp += Number(effect.amount || 0);
+    else if (effect.type === "xp") awardHiddenProgress(`story-effect:${state.sceneId}:${effect.key || effect.amount || "xp"}`, Number(effect.amount || 0), "choices");
   }
 }
 function meetsRequirements(requirements = []) {
@@ -276,7 +321,9 @@ function goToScene(sceneId, effects = []) {
 }
 function makeChoice(choice) {
   if (turnLock || !meetsRequirements(choice.requirements || [])) return;
+  awardHiddenProgress(`choice:${state.sceneId}:${choice.text}`, choice.type === "combat" ? 3 : 6, "choices");
   if (choice.type === "check") {
+    awardHiddenProgress(`check-attempt:${state.sceneId}:${choice.text}`, 4, "checksAttempted");
     const skillId = choice.skill;
     const skill = skillId ? SKILLS[skillId] : null;
     const stat = skill?.stat || choice.stat || "saggezza";
@@ -285,6 +332,7 @@ function makeChoice(choice) {
     const bonus = modifier(state.hero.stats[stat]) + (trained ? state.hero.proficiency : 0);
     const total = roll + bonus;
     const success = total >= choice.dc;
+    if (success) awardHiddenProgress(`check-success:${state.sceneId}:${choice.text}`, 8 + Math.max(0, Number(choice.dc || 10) - 10), "checksSucceeded");
     const testName = skill ? skill.label : STAT_NAMES[stat];
     recordJournal(`Prova di ${testName}: d20 ${roll} ${signed(bonus)} = ${total}, CD ${choice.dc}: ${success ? "successo" : "fallimento"}.`);
     toast(`Prova di ${testName}: ${roll} ${signed(bonus)} = ${total} · ${success ? "Successo" : "Fallimento"}`);
@@ -374,6 +422,7 @@ function combatAction(action) {
   } else if (action === "flee") {
     const roll = rollD20() + modifier(state.hero.stats.destrezza);
     if (roll >= 12) {
+      awardHiddenProgress(`combat-escape:${fight.enemyId}`, 8, "combatsEscaped");
       recordJournal("Sei riuscito a fuggire dal combattimento.");
       state.combat = null;
       state.flags.escapedEncounter = true;
@@ -395,6 +444,7 @@ function combatAction(action) {
     } else combatLog(`Mancato: ${total} non supera la CA ${enemy.ac}.`);
   }
   if (fight.hp <= 0) {
+    awardHiddenProgress(`combat-victory:${fight.enemyId}`, 28 + enemy.hp * 2 + Math.max(0, enemy.attack), "combatsWon");
     state.combat = null;
     recordJournal(`Hai sconfitto ${enemy.name}.`);
     const victoryScene = enemy.victoryScene;
@@ -434,6 +484,9 @@ function die(reason) {
   showScreen(el.ending);
 }
 function showEnding(scene) {
+  if (!state.progression?.rewardedEvents?.includes(`ending:${state.sceneId}`)) {
+    awardHiddenProgress(`ending:${state.sceneId}`, scene.ending === true ? 18 : 8, "choices");
+  }
   state.ended = true;
   saveAutosave();
   $("#ending-title").textContent = scene.title;
@@ -475,6 +528,7 @@ function loadSave(key) {
     if (parsed.schemaVersion !== 1 || !parsed.hero || !story.scenes[parsed.sceneId]) throw new Error("Salvataggio incompatibile");
     if (parsed.mode === "permadeath" && (parsed.dead || localStorage.getItem(saveKey("permadeath-dead")))) return false;
     state = parsed;
+    migrateProgression(state);
     combat = state.combat;
     renderGame();
     return true;
@@ -492,7 +546,7 @@ function renderTabPanel() {
   } else if (activeTab === "inventory") {
     panel.innerHTML = `<h2>Inventario</h2>${state.inventory.length ? `<ul>${state.inventory.map(item => `<li>${safeText(item)}</li>`).join("")}</ul>` : "<p>Non possiedi oggetti.</p>"}`;
   } else if (activeTab === "character") {
-    panel.innerHTML = `<h2>Scheda del personaggio</h2><p><strong>${safeText(state.hero.name)}</strong> · ${state.hero.ancestry || "Umano"} · ${CLASS_DATA[state.hero.classId].label} · ${state.hero.background || "Forestiero"} · Livello ${state.hero.level}</p><p>PF ${state.hero.hp}/${state.hero.maxHp} · CA ${state.hero.armorClass} · Bonus competenza +${state.hero.proficiency}</p><div class="live-sheet-stats">${Object.entries(state.hero.stats).map(([key,value]) => `<div><span>${STAT_NAMES[key]}</span><strong>${value}</strong><small>${signed(modifier(value))}</small></div>`).join("")}</div><p><strong>Abilità:</strong> ${(state.hero.skills || []).map(id => SKILLS[id]?.label || id).join(", ") || "Nessuna"}</p><p><strong>Magie:</strong> ${(state.hero.spells || []).map(id => (SPELLS[state.hero.classId] || []).find(spell => spell.id === id)?.name || id).join(", ") || "Nessuna"}</p><p>Esperienza: ${state.hero.xp} PE</p><p>Modalità: ${state.mode === "permadeath" ? "Permadeath" : "Libera"}</p>`;
+    panel.innerHTML = `<h2>Scheda del personaggio</h2><p><strong>${safeText(state.hero.name)}</strong> · ${state.hero.ancestry || "Umano"} · ${CLASS_DATA[state.hero.classId].label} · ${state.hero.background || "Forestiero"} · Livello ${state.hero.level}</p><p>PF ${state.hero.hp}/${state.hero.maxHp} · CA ${state.hero.armorClass} · Bonus competenza +${state.hero.proficiency}</p><div class="live-sheet-stats">${Object.entries(state.hero.stats).map(([key,value]) => `<div><span>${STAT_NAMES[key]}</span><strong>${value}</strong><small>${signed(modifier(value))}</small></div>`).join("")}</div><p><strong>Abilità:</strong> ${(state.hero.skills || []).map(id => SKILLS[id]?.label || id).join(", ") || "Nessuna"}</p><p><strong>Magie:</strong> ${(state.hero.spells || []).map(id => (SPELLS[state.hero.classId] || []).find(spell => spell.id === id)?.name || id).join(", ") || "Nessuna"}</p><p>Modalità: ${state.mode === "permadeath" ? "Permadeath" : "Libera"}</p>`;
   } else {
     const slots = [1,2,3].map(slot => `<button class="secondary-button" data-save-slot="${slot}">Salva nello slot ${slot}</button>`).join("");
     const loads = [1,2,3].map(slot => `<button class="secondary-button" data-load-slot="${slot}">Carica slot ${slot}</button>`).join("");
