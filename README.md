@@ -24,6 +24,16 @@ Apri `http://localhost:8000`.
 
 URL previsto: `https://lavitasecondopizzi.github.io/il-lamento-dell-innocenza/`.
 
+## Test automatici
+
+Con Node.js 18 o successivo, esegui dalla radice del progetto:
+
+```bash
+node --test tests/*.test.mjs
+```
+
+I test controllano la scena iniziale, i testi delle scene, i riferimenti narrativi, i nemici e la raggiungibilità dei finali. La stessa verifica viene eseguita da GitHub Actions prima della pubblicazione su Pages.
+
 ## Struttura
 
 - `index.html`: schermate e struttura dell'interfaccia.
