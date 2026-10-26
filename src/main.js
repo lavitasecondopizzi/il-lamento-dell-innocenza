@@ -37,7 +37,7 @@ function toast(message) {
   window.clearTimeout(toast.timer);
   toast.timer = window.setTimeout(() => el.toast.classList.add("hidden"), 2400);
 }
-function modifier(score) { return Math.floor((Math.max(1, Number(score) || 10) - 10) / 2); }
+function modifier(score) { return Math.floor((Math.max(0, Number(score) || 0) - 10) / 2); }
 function signed(value) { return value >= 0 ? `+${value}` : String(value); }
 function rollD20() { return 1 + Math.floor(Math.random() * 20); }
 function safeText(value) { return String(value ?? "").replace(/[&<>"']/g, char => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[char])); }
@@ -117,7 +117,7 @@ const SPELLS = {
 const BUILDER_STEPS = ["Identità", "Background", "Lancio dei dadi", "Caratteristiche", "Abilità", "Magie", "Riepilogo"];
 const builder = {
   step: 0, name: "Il Viandante", classId: "guerriero", ancestry: "umano", background: "forestiero", mode: "standard",
-  rolls: [], statValues: Object.fromEntries(ABILITIES.map(key => [key, 8])), remainingPoints: 0, skills: [], spells: []
+  rolls: [], statValues: Object.fromEntries(ABILITIES.map(key => [key, 0])), remainingPoints: 0, skills: [], spells: []
 };
 function getBuilderStats() {
   const ancestry = ANCESTRIES[builder.ancestry] || ANCESTRIES.umano;
@@ -135,7 +135,7 @@ function resetStatAllocation() {
   builder.remainingPoints = builder.rolls.reduce((sum, roll) => sum + roll.score, 0);
 }
 function getAllocatedTotal() {
-  return ABILITIES.reduce((sum, key) => sum + builder.statValues[key] ?? 0, 0);
+  return ABILITIES.reduce((sum, key) => sum + (builder.statValues[key] ?? 0), 0);
 }
 function isCaster() { return ["mago", "chierico", "bardo"].includes(builder.classId); }
 function builderSheetMarkup() {
