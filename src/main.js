@@ -1,4 +1,4 @@
-import { createProgression, awardProgress, levelForExperience, LEVEL_THRESHOLDS } from "./progression.js";
+import { createProgression, awardProgress, levelForExperience } from "./progression.js";
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 const SAVE_PREFIX = "lamento-innocenza-v01";
@@ -385,7 +385,7 @@ function renderGame() {
 function startCombat(enemyId) {
   const enemy = story.enemies[enemyId];
   if (!enemy) { toast("Nemico non definito."); return; }
-  state.combat = { enemyId, hp: enemy.hp, maxHp: enemy.hp, round: 1, log: [`${enemy.name} ti sbarra la strada.`] };
+  state.combat = { enemyId, sceneId: state.sceneId, hp: enemy.hp, maxHp: enemy.hp, round: 1, log: [`${enemy.name} ti sbarra la strada.`] };
   recordJournal(`Combattimento iniziato: ${enemy.name}.`);
   saveAutosave();
   renderGame();
@@ -422,7 +422,7 @@ function combatAction(action) {
   } else if (action === "flee") {
     const roll = rollD20() + modifier(state.hero.stats.destrezza);
     if (roll >= 12) {
-      awardHiddenProgress(`combat-escape:${fight.enemyId}`, 8, "combatsEscaped");
+      awardHiddenProgress(`combat-escape:${fight.sceneId || state.sceneId}:${fight.enemyId}`, 8, "combatsEscaped");
       recordJournal("Sei riuscito a fuggire dal combattimento.");
       state.combat = null;
       state.flags.escapedEncounter = true;
@@ -444,7 +444,7 @@ function combatAction(action) {
     } else combatLog(`Mancato: ${total} non supera la CA ${enemy.ac}.`);
   }
   if (fight.hp <= 0) {
-    awardHiddenProgress(`combat-victory:${fight.enemyId}`, 28 + enemy.hp * 2 + Math.max(0, enemy.attack), "combatsWon");
+    awardHiddenProgress(`combat-victory:${fight.sceneId || state.sceneId}:${fight.enemyId}`, 28 + enemy.hp * 2 + Math.max(0, enemy.attack), "combatsWon");
     state.combat = null;
     recordJournal(`Hai sconfitto ${enemy.name}.`);
     const victoryScene = enemy.victoryScene;
