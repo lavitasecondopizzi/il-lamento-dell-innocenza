@@ -121,13 +121,7 @@ const builder = {
 };
 function getBuilderStats() {
   const ancestry = ANCESTRIES[builder.ancestry] || ANCESTRIES.umano;
-  const base = {};
-  ABILITIES.forEach(key => {
-    const rollIndex = builder.assignment[key];
-    const rolled = Number.isInteger(rollIndex) && builder.rolls[rollIndex] ? builder.rolls[rollIndex].score : 10;
-    base[key] = Math.min(20, rolled + (ancestry.bonuses[key] || 0));
-  });
-  return base;
+  return Object.fromEntries(ABILITIES.map(key => [key, Math.min(20, (builder.statValues[key] || 8) + (ancestry.bonuses[key] || 0))]));
 }
 function isCaster() { return ["mago", "chierico", "bardo"].includes(builder.classId); }
 function builderSheetMarkup() {
