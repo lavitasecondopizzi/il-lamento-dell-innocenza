@@ -211,8 +211,9 @@ function combatAction(action) {
       state.combat = null;
       state.flags.escapedEncounter = true;
       const escapeScene = enemy.escapeScene || story.start;
-      goToScene(escapeScene, [{type:"journal",text:"Hai scelto di fuggire invece di combattere."}]);
+      // goToScene gestisce il proprio lock: libera quello del turno di combattimento prima della transizione.
       turnLock = false;
+      goToScene(escapeScene, [{type:"journal",text:"Hai scelto di fuggire invece di combattere."}]);
       return;
     }
     combatLog(`La fuga fallisce (risultato ${roll}, CD 12).`);
