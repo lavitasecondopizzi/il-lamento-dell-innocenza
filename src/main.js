@@ -153,8 +153,8 @@ function renderGame() {
   el.sceneKicker.textContent = scene.kicker || "IL CUSTODE DEL PONTE";
   el.sceneTitle.textContent = scene.title;
   el.sceneText.innerHTML = (Array.isArray(scene.text) ? scene.text : [scene.text]).map(p => `<p>${safeText(p)}</p>`).join("");
-  el.sceneExtra.classList.toggle("hidden", !scene.note);
-  el.sceneExtra.textContent = scene.note || "";
+  el.extra.classList.toggle("hidden", !scene.note);
+  el.extra.textContent = scene.note || "";
   el.choices.innerHTML = "";
   el.combatPanel.classList.add("hidden");
   if (state.ended || scene.ending) { showEnding(scene); return; }
