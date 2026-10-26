@@ -9,7 +9,6 @@ const CLASS_DATA = {
   chierico: { label: "Chierico", hp: 10, stat: "saggezza", bonus: 2, items: ["Mazza semplice", "Simbolo sacro"] },
   bardo: { label: "Bardo", hp: 8, stat: "carisma", bonus: 2, items: ["Liuto da viaggio", "Pugnale", "Libro di canzoni"] }
 };
-const STANDARD_ARRAY = [15, 14, 13, 12, 10, 8];
 const STAT_NAMES = { forza: "Forza", destrezza: "Destrezza", costituzione: "Costituzione", intelligenza: "Intelligenza", saggezza: "Saggezza", carisma: "Carisma" };
 const MODS = { 3:-4, 4:-3, 5:-3, 6:-2, 7:-2, 8:-1, 9:-1, 10:0, 11:0, 12:1, 13:1, 14:2, 15:2, 16:3, 17:3, 18:4 };
 let state = null;
@@ -41,22 +40,8 @@ function modifier(score) { return Math.floor((Math.max(0, Number(score) || 0) - 
 function signed(value) { return value >= 0 ? `+${value}` : String(value); }
 function rollD20() { return 1 + Math.floor(Math.random() * 20); }
 function safeText(value) { return String(value ?? "").replace(/[&<>"']/g, char => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[char])); }
-function getStatsForClass(classId) {
-  const order = ["forza","destrezza","costituzione","intelligenza","saggezza","carisma"];
-  const classPriority = {
-    guerriero: ["forza","costituzione","destrezza","saggezza","carisma","intelligenza"],
-    mago: ["intelligenza","destrezza","costituzione","saggezza","carisma","forza"],
-    ladro: ["destrezza","intelligenza","carisma","costituzione","saggezza","forza"],
-    chierico: ["saggezza","costituzione","forza","carisma","destrezza","intelligenza"],
-    bardo: ["carisma","destrezza","costituzione","intelligenza","saggezza","forza"]
-  }[classId] || ["forza","costituzione","destrezza","saggezza","carisma","intelligenza"];
-  const result = {};
-  classPriority.forEach((stat, index) => result[stat] = STANDARD_ARRAY[index]);
-  return Object.fromEntries(order.map(stat => [stat, result[stat]]));
-}
-function getDefaultAssignment(classId) {
-  const stats = getStatsForClass(classId);
-  return Object.fromEntries(ABILITIES.map(key => [key, STANDARD_ARRAY.indexOf(stats[key])]));
+function getStatsForClass() {
+  return Object.fromEntries(ABILITIES.map(key => [key, 0]));
 }
 
 const ABILITIES = ["forza", "destrezza", "costituzione", "intelligenza", "saggezza", "carisma"];
