@@ -35,7 +35,7 @@ function toast(message) {
   window.clearTimeout(toast.timer);
   toast.timer = window.setTimeout(() => el.toast.classList.add("hidden"), 2400);
 }
-function modifier(score) { return MODS[Math.max(3, Math.min(18, Number(score) || 10))] ?? 0; }
+function modifier(score) { return Math.floor((Math.max(1, Number(score) || 10) - 10) / 2); }
 function signed(value) { return value >= 0 ? `+${value}` : String(value); }
 function rollD20() { return 1 + Math.floor(Math.random() * 20); }
 function safeText(value) { return String(value ?? "").replace(/[&<>"']/g, char => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[char])); }
@@ -51,19 +51,176 @@ function getStatsForClass(classId) {
   classPriority.forEach((stat, index) => result[stat] = STANDARD_ARRAY[index]);
   return Object.fromEntries(order.map(stat => [stat, result[stat]]));
 }
-function newGame(name, classId, mode) {
+
+const ABILITIES = ["forza", "destrezza", "costituzione", "intelligenza", "saggezza", "carisma"];
+const ANCESTRIES = {
+  umano: { label: "Umano", bonuses: Object.fromEntries(ABILITIES.map(key => [key, 1])), description: "+1 a tutte le caratteristiche" },
+  elfo: { label: "Elfo", bonuses: { destrezza: 2, intelligenza: 1 }, description: "+2 Destrezza, +1 Intelligenza" },
+  nano: { label: "Nano", bonuses: { costituzione: 2, saggezza: 1 }, description: "+2 Costituzione, +1 Saggezza" },
+  halfling: { label: "Halfling", bonuses: { destrezza: 2, carisma: 1 }, description: "+2 Destrezza, +1 Carisma" },
+  tiefling: { label: "Tiefling", bonuses: { carisma: 2, intelligenza: 1 }, description: "+2 Carisma, +1 Intelligenza" }
+};
+const BACKGROUNDS = {
+  accolito: { label: "Accolito", skills: ["religione", "intuizione"], equipment: ["Simbolo votivo", "Libro di preghiere"], description: "Una vita al servizio di un culto." },
+  criminale: { label: "Criminale", skills: ["furtivita", "rapidita di mano"], equipment: ["Attrezzi da scasso", "Mantello scuro"], description: "Contatti, segreti e vita ai margini." },
+  erudito: { label: "Erudito", skills: ["arcano", "storia"], equipment: ["Taccuino", "Inchiostro e penna"], description: "Anni trascorsi tra libri e conoscenza." },
+  eroe_popolare: { label: "Eroe popolare", skills: ["addestrare animali", "sopravvivenza"], equipment: ["Attrezzo da artigiano", "Ricordo di casa"], description: "Hai difeso la tua comunità." },
+  forestiero: { label: "Forestiero", skills: ["natura", "sopravvivenza"], equipment: ["Mantello da viaggio", "Kit da esplorazione"], description: "Hai imparato a sopravvivere lontano dalle città." },
+  nobile: { label: "Nobile", skills: ["persuasione", "storia"], equipment: ["Abiti eleganti", "Anello con sigillo"], description: "Educazione, reputazione e doveri." }
+};
+const SKILLS = {
+  atletica: { label: "Atletica", stat: "forza" }, acrobazia: { label: "Acrobazia", stat: "destrezza" },
+  "rapidita di mano": { label: "Rapidità di mano", stat: "destrezza" }, furtivita: { label: "Furtività", stat: "destrezza" },
+  "resistenza": { label: "Resistenza", stat: "costituzione" }, arcano: { label: "Arcano", stat: "intelligenza" },
+  storia: { label: "Storia", stat: "intelligenza" }, investigazione: { label: "Investigazione", stat: "intelligenza" },
+  natura: { label: "Natura", stat: "intelligenza" }, religione: { label: "Religione", stat: "intelligenza" },
+  "addestrare animali": { label: "Addestrare animali", stat: "saggezza" }, intuizione: { label: "Intuizione", stat: "saggezza" },
+  medicina: { label: "Medicina", stat: "saggezza" }, percezione: { label: "Percezione", stat: "saggezza" },
+  sopravvivenza: { label: "Sopravvivenza", stat: "saggezza" }, inganno: { label: "Inganno", stat: "carisma" },
+  intimidazione: { label: "Intimidazione", stat: "carisma" }, intrattenere: { label: "Intrattenere", stat: "carisma" },
+  persuasione: { label: "Persuasione", stat: "carisma" }
+};
+const CLASS_SKILLS = {
+  guerriero: ["atletica", "intimidazione", "percezione", "sopravvivenza", "storia", "acrobazia"],
+  mago: ["arcano", "storia", "investigazione", "medicina", "religione", "intuizione"],
+  ladro: ["acrobazia", "atletica", "inganno", "investigazione", "percezione", "rapidita di mano", "furtivita", "intimidazione"],
+  chierico: ["medicina", "intuizione", "religione", "persuasione", "storia"]
+};
+const SPELLS = {
+  mago: [
+    { id: "dardo_arcano", name: "Dardo arcano", description: "Un colpo di energia a distanza." },
+    { id: "scudo_eterico", name: "Scudo eterico", description: "Una barriera riduce il prossimo danno subito." },
+    { id: "luce_errante", name: "Luce errante", description: "Una sfera luminosa rischiara il cammino." },
+    { id: "sonno", name: "Sussurro soporifero", description: "Un impulso arcano induce torpore." }
+  ],
+  chierico: [
+    { id: "cura_lieve", name: "Cura lieve", description: "Ripristina una piccola quantità di punti vita." },
+    { id: "fiamma_sacra", name: "Fiamma sacra", description: "Una scintilla sacra colpisce un avversario." },
+    { id: "protezione", name: "Velo protettivo", description: "Una preghiera attenua il prossimo colpo." },
+    { id: "guida", name: "Guida", description: "Una benedizione aiuta una prova di abilità." }
+  ]
+};
+const BUILDER_STEPS = ["Identità", "Lancio dei dadi", "Caratteristiche", "Abilità", "Magie", "Riepilogo"];
+const builder = {
+  step: 0, name: "Il Viandante", classId: "guerriero", ancestry: "umano", background: "forestiero", mode: "standard",
+  rolls: [], assignment: {}, skills: [], spells: []
+};
+function rollAbilityScores() {
+  return Array.from({ length: 6 }, () => {
+    const dice = Array.from({ length: 4 }, () => 1 + Math.floor(Math.random() * 6));
+    const dropped = Math.min(...dice);
+    return { dice, dropped, score: dice.reduce((sum, die) => sum + die, 0) - dropped };
+  });
+}
+function getBuilderStats() {
+  const ancestry = ANCESTRIES[builder.ancestry] || ANCESTRIES.umano;
+  const base = {};
+  ABILITIES.forEach(key => {
+    const rollIndex = builder.assignment[key];
+    const rolled = Number.isInteger(rollIndex) && builder.rolls[rollIndex] ? builder.rolls[rollIndex].score : 10;
+    base[key] = Math.min(20, rolled + (ancestry.bonuses[key] || 0));
+  });
+  return base;
+}
+function isCaster() { return ["mago", "chierico"].includes(builder.classId); }
+function builderSheetMarkup() {
+  const stats = getBuilderStats();
+  const name = safeText(builder.name.trim() || "Il Viandante");
+  const klass = CLASS_DATA[builder.classId] || CLASS_DATA.guerriero;
+  const ancestry = ANCESTRIES[builder.ancestry] || ANCESTRIES.umano;
+  const background = BACKGROUNDS[builder.background] || BACKGROUNDS.forestiero;
+  const skills = [...new Set([...background.skills, ...builder.skills])];
+  const skillMarkup = skills.map(id => {
+    const skill = SKILLS[id];
+    return skill ? `<li>${safeText(skill.label)} <strong>${signed(modifier(stats[skill.stat]) + (builder.skills.includes(id) || background.skills.includes(id) ? 2 : 0))}</strong></li>` : "";
+  }).join("");
+  return `<div class="live-sheet-heading"><p class="eyebrow">SCHEDA IN COSTRUZIONE</p><h3>${name}</h3><p>${safeText(ancestry.label)} · ${safeText(klass.label)}</p><p class="muted">${safeText(background.label)}</p></div>
+    <div class="live-sheet-stats">${ABILITIES.map(key => `<div><span>${STAT_NAMES[key]}</span><strong>${stats[key]}</strong><small>${signed(modifier(stats[key]))}</small></div>`).join("")}</div>
+    <div class="live-sheet-derived"><span>PF stimati <strong>${klass.hp + modifier(stats.costituzione)}</strong></span><span>CA stimata <strong>${10 + modifier(stats.destrezza)}</strong></span><span>Competenza <strong>+2</strong></span></div>
+    <h4>Abilità</h4><ul class="live-sheet-skills">${skillMarkup || "<li>Da scegliere</li>"}</ul>
+    <h4>Magie</h4><ul class="live-sheet-skills">${(builder.spells.length ? builder.spells.map(id => (SPELLS[builder.classId] || []).find(spell => spell.id === id)?.name).filter(Boolean) : []).map(safeText).map(name => `<li>${name}</li>`).join("") || "<li>Nessuna selezionata</li>"}</ul>
+    <p class="sheet-hint">La scheda si aggiorna mentre modifichi le scelte.</p>`;
+}
+function renderBuilder() {
+  const form = el.form;
+  const step = builder.step;
+  let content = "";
+  if (step === 0) {
+    content = `<div class="wizard-step"><p class="eyebrow">PASSO 1 DI 6</p><h3>Identità e origini</h3><label class="field-label" for="builder-name">Nome del personaggio</label><input id="builder-name" maxlength="32" value="${safeText(builder.name)}" required>
+      <div class="builder-field-grid"><label class="field-label">Discendenza<select id="builder-ancestry">${Object.entries(ANCESTRIES).map(([id,item]) => `<option value="${id}" ${builder.ancestry===id?"selected":""}>${item.label} — ${item.description}</option>`).join("")}</select></label>
+      <label class="field-label">Classe<select id="builder-class">${Object.entries(CLASS_DATA).map(([id,item]) => `<option value="${id}" ${builder.classId===id?"selected":""}>${item.label}</option>`).join("")}</select></label>
+      <label class="field-label">Background<select id="builder-background">${Object.entries(BACKGROUNDS).map(([id,item]) => `<option value="${id}" ${builder.background===id?"selected":""}>${item.label} — ${item.description}</option>`).join("")}</select></label>
+      <label class="field-label">Modalità di partita<select id="builder-mode"><option value="standard" ${builder.mode==="standard"?"selected":""}>Libera</option><option value="permadeath" ${builder.mode==="permadeath"?"selected":""}>Permadeath</option></select></label></div>
+      <p class="wizard-note">Classe, discendenza e background modificano la scheda, l'equipaggiamento e le abilità disponibili.</p></div>`;
+  } else if (step === 1) {
+    content = `<div class="wizard-step"><p class="eyebrow">PASSO 2 DI 6</p><h3>Determina le caratteristiche</h3><p>Per ogni caratteristica lancia 4d6 e scarta il dado più basso. I sei risultati ottenuti saranno poi distribuiti liberamente.</p><button type="button" class="secondary-button" id="roll-abilities">Lancia i dadi (4d6, scarta il minore)</button>
+      ${builder.rolls.length ? `<div class="dice-results">${builder.rolls.map((roll,index)=>`<div class="dice-result"><strong>Risultato ${index+1}: ${roll.score}</strong><span>Dadi: ${roll.dice.map((die,i)=>i===roll.dice.indexOf(roll.dropped)?"":"").length ? roll.dice.map((die,i)=>`<i class="${die===roll.dropped && roll.dice.indexOf(die)===i?"dropped-die":""}">${die}</i>`).join(" ") : ""}</span><small>Scartato: ${roll.dropped}</small></div>`).join("")}</div><p class="wizard-note">Puoi rilanciare prima di proseguire. Una volta confermati, i risultati restano quelli della partita.</p>` : `<p class="wizard-note">Non hai ancora lanciato i dadi.</p>`}</div>`;
+  } else if (step === 2) {
+    const used = Object.values(builder.assignment).filter(Number.isInteger);
+    content = `<div class="wizard-step"><p class="eyebrow">PASSO 3 DI 6</p><h3>Distribuisci i risultati</h3><p>Assegna un risultato diverso a ciascuna caratteristica. I bonus della discendenza si applicano automaticamente; i modificatori sono calcolati in tempo reale.</p><div class="ability-assignment">${ABILITIES.map(key=>`<label><span>${STAT_NAMES[key]}</span><select data-ability="${key}"><option value="">Scegli un risultato</option>${builder.rolls.map((roll,index)=>`<option value="${index}" ${builder.assignment[key]===index?"selected":""} ${used.includes(index)&&builder.assignment[key]!==index?"disabled":""}>Risultato ${index+1}: ${roll.score}</option>`).join("")}</select><strong>${getBuilderStats()[key]} (${signed(modifier(getBuilderStats()[key]))})</strong></label>`).join("")}</div></div>`;
+  } else if (step === 3) {
+    const backgroundSkills = BACKGROUNDS[builder.background].skills;
+    const options = CLASS_SKILLS[builder.classId].filter(id => !backgroundSkills.includes(id));
+    content = `<div class="wizard-step"><p class="eyebrow">PASSO 4 DI 6</p><h3>Scegli le abilità</h3><p>Il background concede automaticamente due competenze. Scegli altre <strong>due</strong> abilità tra quelle della tua classe.</p><p class="wizard-note">Competenze del background: ${backgroundSkills.map(id=>SKILLS[id].label).join(", ")}.</p><div class="skill-choice-grid">${options.map(id=>`<label class="skill-choice"><input type="checkbox" data-skill="${id}" ${builder.skills.includes(id)?"checked":""}><span><strong>${SKILLS[id].label}</strong><small>${STAT_NAMES[SKILLS[id].stat]}</small></span></label>`).join("")}</div><p class="wizard-note">Selezionate: ${builder.skills.length} / 2</p></div>`;
+  } else if (step === 4) {
+    const spells = SPELLS[builder.classId] || [];
+    content = `<div class="wizard-step"><p class="eyebrow">PASSO 5 DI 6</p><h3>${isCaster()?"Scegli le magie iniziali":"Talenti e capacità"}</h3>${isCaster()? `<p>Seleziona due magie iniziali. Potrai ampliarle durante lo sviluppo del sistema magico.</p><div class="spell-choice-grid">${spells.map(spell=>`<label class="spell-choice"><input type="checkbox" data-spell="${spell.id}" ${builder.spells.includes(spell.id)?"checked":""}><span><strong>${spell.name}</strong><small>${spell.description}</small></span></label>`).join("")}</div><p class="wizard-note">Selezionate: ${builder.spells.length} / 2</p>` : `<p>Questa classe non utilizza magie nel prototipo. Le sue capacità derivano da caratteristiche, abilità ed equipaggiamento.</p>`}</div>`;
+  } else {
+    const stats = getBuilderStats();
+    content = `<div class="wizard-step"><p class="eyebrow">PASSO 6 DI 6</p><h3>Pronto per partire</h3><p>Controlla la scheda a lato. Quando confermi, i valori vengono salvati nella partita e usati da prove e combattimenti.</p><div class="review-list"><p><strong>Discendenza:</strong> ${ANCESTRIES[builder.ancestry].label}</p><p><strong>Classe:</strong> ${CLASS_DATA[builder.classId].label}</p><p><strong>Background:</strong> ${BACKGROUNDS[builder.background].label}</p><p><strong>Caratteristiche:</strong> ${ABILITIES.map(key=>`${STAT_NAMES[key]} ${stats[key]} (${signed(modifier(stats[key]))})`).join(" · ")}</p><p><strong>Abilità scelte:</strong> ${builder.skills.map(id=>SKILLS[id].label).join(", ") || "Nessuna"}</p><p><strong>Magie:</strong> ${builder.spells.map(id=>(SPELLS[builder.classId]||[]).find(spell=>spell.id===id)?.name).filter(Boolean).join(", ") || "Nessuna"}</p></div></div>`;
+  }
+  form.innerHTML = `<div class="wizard-layout"><div class="wizard-main">${content}<div class="wizard-navigation"><button type="button" id="builder-back" class="secondary-button" ${step===0?"disabled":""}>Indietro</button>${step<5?`<button type="button" id="builder-next" class="primary-button">${step===4?"Riepilogo":"Continua"} <span>↗</span></button>`:`<button type="submit" class="primary-button">Comincia il viaggio <span>↗</span></button>`}</div></div><aside class="live-character-sheet">${builderSheetMarkup()}</aside></div>`;
+}
+function builderValidationMessage() {
+  if (builder.step === 1 && builder.rolls.length !== 6) return "Lancia i dadi prima di proseguire.";
+  if (builder.step === 2 && (Object.keys(builder.assignment).length !== 6 || new Set(Object.values(builder.assignment)).size !== 6)) return "Assegna tutti e sei i risultati senza ripeterli.";
+  if (builder.step === 3 && builder.skills.length !== 2) return "Scegli esattamente due abilità.";
+  if (builder.step === 4 && isCaster() && builder.spells.length !== 2) return "Scegli esattamente due magie iniziali.";
+  return "";
+}
+function handleBuilderChange(event) {
+  const target = event.target;
+  if (target.id === "builder-name") builder.name = target.value;
+  if (target.id === "builder-ancestry") builder.ancestry = target.value;
+  if (target.id === "builder-class") {
+    builder.classId = target.value;
+    builder.skills = [];
+    builder.spells = [];
+  }
+  if (target.id === "builder-background") { builder.background = target.value; builder.skills = []; }
+  if (target.id === "builder-mode") builder.mode = target.value;
+  if (target.dataset.ability) {
+    if (target.value === "") delete builder.assignment[target.dataset.ability];
+    else builder.assignment[target.dataset.ability] = Number(target.value);
+  }
+  if (target.dataset.skill) {
+    const id = target.dataset.skill;
+    if (target.checked && builder.skills.length < 2) builder.skills.push(id);
+    else if (target.checked) target.checked = false;
+    else builder.skills = builder.skills.filter(item => item !== id);
+  }
+  if (target.dataset.spell) {
+    const id = target.dataset.spell;
+    if (target.checked && builder.spells.length < 2) builder.spells.push(id);
+    else if (target.checked) target.checked = false;
+    else builder.spells = builder.spells.filter(item => item !== id);
+  }
+  renderBuilder();
+}
+
+function newGame(name, classId, mode, characterBuild = null) {
   if (mode === "permadeath") {
     try { localStorage.removeItem(saveKey("permadeath-dead")); } catch (error) {
       console.warn("Impossibile azzerare il blocco permadeath nel browser.", error);
     }
   }
   const klass = CLASS_DATA[classId] || CLASS_DATA.guerriero;
-  const stats = getStatsForClass(classId);
+  const stats = characterBuild?.stats || getStatsForClass(classId);
   const maxHp = klass.hp + modifier(stats.costituzione);
   state = {
     schemaVersion: 1, runId: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
-    hero: { name: name.trim() || "Il Viandante", classId, level: 1, xp: 0, stats, maxHp, hp: maxHp, armorClass: 10 + modifier(stats.destrezza), proficiency: 2 },
-    mode, sceneId: story.start, flags: {}, inventory: [...klass.items, "Una moneta annerita"], journal: [], visited: [],
+    hero: { name: name.trim() || "Il Viandante", classId, ancestry: characterBuild?.ancestry || "umano", background: characterBuild?.background || "forestiero", level: 1, xp: 0, stats, maxHp, hp: maxHp, armorClass: 10 + modifier(stats.destrezza), proficiency: 2, skills: characterBuild?.skills || [], spells: characterBuild?.spells || [] },
+    mode, sceneId: story.start, flags: {}, inventory: [...klass.items, ...(characterBuild?.equipment || []), "Una moneta annerita"], journal: [], visited: [],
     lucidity: 100, combat: null, dead: false, ended: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
   };
   combat = null;
@@ -330,7 +487,7 @@ function renderTabPanel() {
   } else if (activeTab === "inventory") {
     panel.innerHTML = `<h2>Inventario</h2>${state.inventory.length ? `<ul>${state.inventory.map(item => `<li>${safeText(item)}</li>`).join("")}</ul>` : "<p>Non possiedi oggetti.</p>"}`;
   } else if (activeTab === "character") {
-    panel.innerHTML = `<h2>Scheda del personaggio</h2><p><strong>${safeText(state.hero.name)}</strong> · ${CLASS_DATA[state.hero.classId].label} · Livello ${state.hero.level}</p><p>PF ${state.hero.hp}/${state.hero.maxHp} · CA ${state.hero.armorClass} · Bonus competenza +${state.hero.proficiency}</p><p>Esperienza: ${state.hero.xp} PE</p><p>Modalità: ${state.mode === "permadeath" ? "Permadeath" : "Libera"}</p>`;
+    panel.innerHTML = `<h2>Scheda del personaggio</h2><p><strong>${safeText(state.hero.name)}</strong> · ${state.hero.ancestry || "Umano"} · ${CLASS_DATA[state.hero.classId].label} · ${state.hero.background || "Forestiero"} · Livello ${state.hero.level}</p><p>PF ${state.hero.hp}/${state.hero.maxHp} · CA ${state.hero.armorClass} · Bonus competenza +${state.hero.proficiency}</p><div class="live-sheet-stats">${Object.entries(state.hero.stats).map(([key,value]) => `<div><span>${STAT_NAMES[key]}</span><strong>${value}</strong><small>${signed(modifier(value))}</small></div>`).join("")}</div><p><strong>Abilità:</strong> ${(state.hero.skills || []).map(id => SKILLS[id]?.label || id).join(", ") || "Nessuna"}</p><p><strong>Magie:</strong> ${(state.hero.spells || []).map(id => (SPELLS[state.hero.classId] || []).find(spell => spell.id === id)?.name || id).join(", ") || "Nessuna"}</p><p>Esperienza: ${state.hero.xp} PE</p><p>Modalità: ${state.mode === "permadeath" ? "Permadeath" : "Libera"}</p>`;
   } else {
     const slots = [1,2,3].map(slot => `<button class="secondary-button" data-save-slot="${slot}">Salva nello slot ${slot}</button>`).join("");
     const loads = [1,2,3].map(slot => `<button class="secondary-button" data-load-slot="${slot}">Carica slot ${slot}</button>`).join("");
@@ -366,11 +523,48 @@ async function init() {
   }
   $("#new-game-button").addEventListener("click", () => showScreen(el.character));
   $("#back-title").addEventListener("click", backToTitle);
-  $("#character-form").addEventListener("submit", event => {
+  renderBuilder();
+  el.form.addEventListener("change", handleBuilderChange);
+  el.form.addEventListener("input", event => {
+    if (event.target.id === "builder-name") {
+      builder.name = event.target.value;
+      const sheet = document.querySelector(".live-character-sheet");
+      if (sheet) sheet.innerHTML = builderSheetMarkup();
+    }
+  });
+  el.form.addEventListener("click", event => {
+    if (event.target.closest("#roll-abilities")) {
+      builder.rolls = rollAbilityScores();
+      builder.assignment = {};
+      renderBuilder();
+    }
+    if (event.target.closest("#builder-back")) {
+      builder.step = Math.max(0, builder.step - 1);
+      renderBuilder();
+    }
+    if (event.target.closest("#builder-next")) {
+      const error = builderValidationMessage();
+      if (error) { toast(error); return; }
+      builder.step = Math.min(5, builder.step + 1);
+      renderBuilder();
+    }
+  });
+  el.form.addEventListener("submit", event => {
     event.preventDefault();
     try {
-      const form = new FormData(el.form);
-      newGame(el.name.value, form.get("heroClass") || "guerriero", form.get("saveMode") || "standard");
+      const error = builderValidationMessage();
+      if (builder.step !== 5 || error) {
+        toast(error || "Completa tutti i passaggi della scheda.");
+        return;
+      }
+      const stats = getBuilderStats();
+      const klass = CLASS_DATA[builder.classId];
+      const background = BACKGROUNDS[builder.background];
+      newGame(builder.name, builder.classId, builder.mode, {
+        stats, ancestry: builder.ancestry, background: builder.background,
+        skills: [...new Set([...background.skills, ...builder.skills])],
+        spells: [...builder.spells], equipment: background.equipment
+      });
     } catch (error) {
       console.error("Errore durante l'avvio della partita:", error);
       toast("Non è stato possibile avviare la partita. Ricarica la pagina e riprova.");
