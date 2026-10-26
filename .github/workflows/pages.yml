@@ -20,6 +20,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Check JavaScript syntax
+        run: node --check src/main.js
       - name: Run story validation tests
         run: node --test tests/*.test.mjs
       - name: Configure Pages
