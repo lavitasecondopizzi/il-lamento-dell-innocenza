@@ -44,8 +44,12 @@ I test controllano la scena iniziale, i testi delle scene, i riferimenti narrati
 
 ## Funzioni attuali
 
-- Quattro classi iniziali: guerriero, mago, ladro, chierico.
-- Sei caratteristiche con array standard e modificatori.
+- Wizard di creazione personaggio con anteprima della scheda in tempo reale.
+- Cinque discendenze, quattro classi e sei background selezionabili.
+- Lancio di 4d6 per ciascuna caratteristica, scartando il dado più basso; distribuzione dei sei risultati senza duplicati.
+- Bonus di discendenza e modificatori derivati ricalcolati automaticamente.
+- Competenze di classe/background e selezione di magie iniziali per mago e chierico.
+- Punti vita, classe armatura, prove e combattimento collegati alle caratteristiche.
 - Scelte narrative con requisiti ed effetti.
 - Prove d20 e un combattimento dimostrativo.
 - Diario, inventario e scheda.
