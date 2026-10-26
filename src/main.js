@@ -123,6 +123,20 @@ function getBuilderStats() {
   const ancestry = ANCESTRIES[builder.ancestry] || ANCESTRIES.umano;
   return Object.fromEntries(ABILITIES.map(key => [key, Math.min(20, (builder.statValues[key] || 8) + (ancestry.bonuses[key] || 0))]));
 }
+function rollAbilityScores() {
+  return Array.from({ length: 6 }, () => {
+    const dice = Array.from({ length: 4 }, () => 1 + Math.floor(Math.random() * 6));
+    const droppedIndex = dice.indexOf(Math.min(...dice));
+    return { dice, dropped: dice[droppedIndex], score: dice.reduce((sum, die, index) => sum + (index === droppedIndex ? 0 : die), 0) };
+  });
+}
+function resetStatAllocation() {
+  builder.statValues = Object.fromEntries(ABILITIES.map(key => [key, 8]));
+  builder.remainingPoints = Math.max(0, builder.rolls.reduce((sum, roll) => sum + roll.score, 0) - 8 * ABILITIES.length);
+}
+function getAllocatedTotal() {
+  return ABILITIES.reduce((sum, key) => sum + builder.statValues[key], 0);
+}
 function isCaster() { return ["mago", "chierico", "bardo"].includes(builder.classId); }
 function builderSheetMarkup() {
   const stats = getBuilderStats();
