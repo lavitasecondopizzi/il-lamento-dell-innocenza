@@ -9,7 +9,6 @@ const CLASS_DATA = {
   chierico: { label: "Chierico", hp: 10, stat: "saggezza", bonus: 2, items: ["Mazza semplice", "Simbolo sacro"] },
   bardo: { label: "Bardo", hp: 8, stat: "carisma", bonus: 2, items: ["Liuto da viaggio", "Pugnale", "Libro di canzoni"] }
 };
-const STANDARD_ARRAY = [15, 14, 13, 12, 10, 8];
 const STAT_NAMES = { forza: "Forza", destrezza: "Destrezza", costituzione: "Costituzione", intelligenza: "Intelligenza", saggezza: "Saggezza", carisma: "Carisma" };
 const MODS = { 3:-4, 4:-3, 5:-3, 6:-2, 7:-2, 8:-1, 9:-1, 10:0, 11:0, 12:1, 13:1, 14:2, 15:2, 16:3, 17:3, 18:4 };
 let state = null;
@@ -37,26 +36,12 @@ function toast(message) {
   window.clearTimeout(toast.timer);
   toast.timer = window.setTimeout(() => el.toast.classList.add("hidden"), 2400);
 }
-function modifier(score) { return Math.floor((Math.max(1, Number(score) || 10) - 10) / 2); }
+function modifier(score) { return Math.floor((Math.max(0, Number(score) || 0) - 10) / 2); }
 function signed(value) { return value >= 0 ? `+${value}` : String(value); }
 function rollD20() { return 1 + Math.floor(Math.random() * 20); }
 function safeText(value) { return String(value ?? "").replace(/[&<>"']/g, char => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[char])); }
-function getStatsForClass(classId) {
-  const order = ["forza","destrezza","costituzione","intelligenza","saggezza","carisma"];
-  const classPriority = {
-    guerriero: ["forza","costituzione","destrezza","saggezza","carisma","intelligenza"],
-    mago: ["intelligenza","destrezza","costituzione","saggezza","carisma","forza"],
-    ladro: ["destrezza","intelligenza","carisma","costituzione","saggezza","forza"],
-    chierico: ["saggezza","costituzione","forza","carisma","destrezza","intelligenza"],
-    bardo: ["carisma","destrezza","costituzione","intelligenza","saggezza","forza"]
-  }[classId] || ["forza","costituzione","destrezza","saggezza","carisma","intelligenza"];
-  const result = {};
-  classPriority.forEach((stat, index) => result[stat] = STANDARD_ARRAY[index]);
-  return Object.fromEntries(order.map(stat => [stat, result[stat]]));
-}
-function getDefaultAssignment(classId) {
-  const stats = getStatsForClass(classId);
-  return Object.fromEntries(ABILITIES.map(key => [key, STANDARD_ARRAY.indexOf(stats[key])]));
+function getStatsForClass() {
+  return Object.fromEntries(ABILITIES.map(key => [key, 0]));
 }
 
 const ABILITIES = ["forza", "destrezza", "costituzione", "intelligenza", "saggezza", "carisma"];
@@ -114,20 +99,28 @@ const SPELLS = {
     { id: "cura_melodica", name: "Cura melodica", description: "Una breve melodia ristora le forze." }
   ]
 };
-const BUILDER_STEPS = ["Identità", "Array standard", "Caratteristiche", "Abilità", "Magie", "Riepilogo"];
+const BUILDER_STEPS = ["Identità", "Background", "Lancio dei dadi", "Caratteristiche", "Abilità", "Magie", "Riepilogo"];
 const builder = {
   step: 0, name: "Il Viandante", classId: "guerriero", ancestry: "umano", background: "forestiero", mode: "standard",
-  rolls: STANDARD_ARRAY.map(score => ({ score })), assignment: getDefaultAssignment("guerriero"), skills: [], spells: []
+  rolls: [], statValues: Object.fromEntries(ABILITIES.map(key => [key, 0])), remainingPoints: 0, skills: [], spells: []
 };
 function getBuilderStats() {
   const ancestry = ANCESTRIES[builder.ancestry] || ANCESTRIES.umano;
-  const base = {};
-  ABILITIES.forEach(key => {
-    const rollIndex = builder.assignment[key];
-    const rolled = Number.isInteger(rollIndex) && builder.rolls[rollIndex] ? builder.rolls[rollIndex].score : 10;
-    base[key] = Math.min(20, rolled + (ancestry.bonuses[key] || 0));
+  return Object.fromEntries(ABILITIES.map(key => [key, Math.min(20, (builder.statValues[key] ?? 0) + (ancestry.bonuses[key] || 0))]));
+}
+function rollAbilityScores() {
+  return Array.from({ length: 6 }, () => {
+    const dice = Array.from({ length: 4 }, () => 1 + Math.floor(Math.random() * 6));
+    const droppedIndex = dice.indexOf(Math.min(...dice));
+    return { dice, dropped: dice[droppedIndex], score: dice.reduce((sum, die, index) => sum + (index === droppedIndex ? 0 : die), 0) };
   });
-  return base;
+}
+function resetStatAllocation() {
+  builder.statValues = Object.fromEntries(ABILITIES.map(key => [key, 0]));
+  builder.remainingPoints = builder.rolls.reduce((sum, roll) => sum + roll.score, 0);
+}
+function getAllocatedTotal() {
+  return ABILITIES.reduce((sum, key) => sum + (builder.statValues[key] ?? 0), 0);
 }
 function isCaster() { return ["mago", "chierico", "bardo"].includes(builder.classId); }
 function builderSheetMarkup() {
@@ -153,53 +146,46 @@ function renderBuilder() {
   const step = builder.step;
   let content = "";
   if (step === 0) {
-    content = `<div class="wizard-step"><p class="eyebrow">PASSO 1 DI 6</p><h3>Identità e origini</h3><label class="field-label" for="builder-name">Nome del personaggio</label><input id="builder-name" maxlength="32" value="${safeText(builder.name)}" required>
+    content = `<div class="wizard-step"><p class="eyebrow">PASSO 1 DI 7</p><h3>Identità e origini</h3><label class="field-label" for="builder-name">Nome del personaggio</label><input id="builder-name" maxlength="32" value="${safeText(builder.name)}" required>
       <div class="builder-field-grid"><label class="field-label">Discendenza<select id="builder-ancestry">${Object.entries(ANCESTRIES).map(([id,item]) => `<option value="${id}" ${builder.ancestry===id?"selected":""}>${item.label} — ${item.description}</option>`).join("")}</select></label>
       <label class="field-label">Classe<select id="builder-class">${Object.entries(CLASS_DATA).map(([id,item]) => `<option value="${id}" ${builder.classId===id?"selected":""}>${item.label}</option>`).join("")}</select></label>
-      <label class="field-label">Background<select id="builder-background">${Object.entries(BACKGROUNDS).map(([id,item]) => `<option value="${id}" ${builder.background===id?"selected":""}>${item.label} — ${item.description}</option>`).join("")}</select></label>
       <label class="field-label">Modalità di partita<select id="builder-mode"><option value="standard" ${builder.mode==="standard"?"selected":""}>Libera</option><option value="permadeath" ${builder.mode==="permadeath"?"selected":""}>Permadeath</option></select></label></div>
-      <p class="wizard-note">Classe, discendenza e background modificano la scheda, l'equipaggiamento e le abilità disponibili.</p></div>`;
+      <p class="wizard-note">La discendenza determina i bonus caratteristica; la classe determina punti vita, equipaggiamento e abilità disponibili.</p></div>`;
   } else if (step === 1) {
-    content = `<div class="wizard-step"><p class="eyebrow">PASSO 2 DI 6</p><h3>Array standard</h3><p>Usa i sei valori previsti dal regolamento: <strong>15, 14, 13, 12, 10, 8</strong>. Sono già distribuiti secondo le caratteristiche più utili alla classe scelta, ma puoi riassegnarli nel passaggio successivo.</p><div class="dice-results">${builder.rolls.map((roll,index)=>`<div class="dice-result"><strong>Valore ${index+1}</strong><span>${roll.score}</span></div>`).join("")}</div></div>`;
+    content = `<div class="wizard-step"><p class="eyebrow">PASSO 2 DI 7</p><h3>Scegli il background</h3><p>Il tuo passato determina le competenze che possiedi e gli oggetti con cui inizi il viaggio. Leggi le descrizioni prima di scegliere.</p><div class="background-choice-grid">${Object.entries(BACKGROUNDS).map(([id,item]) => `<label class="background-choice ${builder.background===id?"selected":""}"><input type="radio" name="builder-background" value="${id}" ${builder.background===id?"checked":""}><span><strong>${safeText(item.label)}</strong><small>${safeText(item.description)}</small><span class="background-details">${safeText(({accolito:"Sei cresciuto tra riti, preghiere e gerarchie spirituali. Sai riconoscere simboli sacri, comprendere le tradizioni religiose e leggere le motivazioni di chi cerca conforto nella fede.",criminale:"Hai imparato a sopravvivere tra vicoli, mercati clandestini e persone di cui non fidarti. Conosci i codici della strada, sai muoverti senza attirare l’attenzione e sai che ogni segreto ha un prezzo.",erudito:"Hai dedicato anni allo studio di cronache, teorie e testi antichi. Cerchi spiegazioni nei dettagli, colleghi informazioni apparentemente lontane e sai orientarti tra conoscenze accademiche e arcane.",eroe_popolare:"Hai difeso la tua comunità quando nessun altro voleva o poteva farlo. La gente comune può riconoscerti come una persona affidabile, mentre la tua esperienza pratica ti aiuta a trattare con animali e affrontare difficoltà quotidiane.",forestiero:"Sei cresciuto lontano dalle città, imparando a leggere il terreno, il tempo e i segnali della natura. Sai trovare percorsi, procurarti il necessario e resistere quando la civiltà è soltanto un ricordo lontano.",nobile:"Sei stato educato tra obblighi, alleanze e reputazioni. Conosci le convenzioni delle corti, sai sostenere una conversazione formale e comprendi quanto possano pesare un titolo, una promessa o un anello con sigillo."})[id])}</span><small><strong>Competenze:</strong> ${item.skills.map(skill => SKILLS[skill]?.label || skill).join(", ")}</small><small><strong>Equipaggiamento:</strong> ${item.equipment.join(", ")}</small></span></label>`).join("")}</div></div>`;
   } else if (step === 2) {
-    const used = Object.values(builder.assignment).filter(Number.isInteger);
-    content = `<div class="wizard-step"><p class="eyebrow">PASSO 3 DI 6</p><h3>Distribuisci i risultati</h3><p>Assegna un risultato diverso a ciascuna caratteristica. I bonus della discendenza si applicano automaticamente; i modificatori sono calcolati in tempo reale.</p><div class="ability-assignment">${ABILITIES.map(key=>`<label><span>${STAT_NAMES[key]}</span><select data-ability="${key}"><option value="">Scegli un risultato</option>${builder.rolls.map((roll,index)=>`<option value="${index}" ${builder.assignment[key]===index?"selected":""} ${used.includes(index)&&builder.assignment[key]!==index?"disabled":""}>Risultato ${index+1}: ${roll.score}</option>`).join("")}</select><strong>${getBuilderStats()[key]} (${signed(modifier(getBuilderStats()[key]))})</strong></label>`).join("")}</div></div>`;
+    const total = builder.rolls.reduce((sum, roll) => sum + roll.score, 0);
+    content = `<div class="wizard-step"><p class="eyebrow">PASSO 3 DI 7</p><h3>Lancia i dadi</h3><p>Lancia sei volte <strong>4d6</strong>: per ogni tiro viene scartato automaticamente il dado più basso. La somma dei sei risultati è il totale dei punti che potrai distribuire liberamente fra le caratteristiche. Non ricevi punti già assegnati.</p><button type="button" id="roll-ability-dice" class="primary-button">${builder.rolls.length ? "Rilancia i dadi" : "Lancia 24 dadi"}</button>${builder.rolls.length ? `<div class="dice-results">${builder.rolls.map((roll,index)=>`<div class="dice-result"><strong>Tiro ${index+1}</strong><span>${roll.score}</span><small>Dadi: ${roll.dice.join(" · ")} · scartato ${roll.dropped}</small></div>`).join("")}</div><p class="wizard-note">Totale da distribuire: <strong>${total} punti</strong>. Il rilancio azzera la distribuzione corrente.</p>` : "<p class='wizard-note'>Non hai ancora lanciato i dadi.</p>"}</div>`;
   } else if (step === 3) {
+    const total = builder.rolls.reduce((sum, roll) => sum + roll.score, 0);
+    content = `<div class="wizard-step"><p class="eyebrow">PASSO 4 DI 7</p><h3>Distribuisci i punti</h3><p>Tutte le caratteristiche partono da <strong>0</strong>. Usa + e − per assegnare i punti ottenuti; non ci sono valori pre-distribuiti. Il valore base massimo è 18 per caratteristica. I bonus della discendenza si aggiungono separatamente.</p><div class="points-counter">Punti rimanenti: <strong>${builder.remainingPoints}</strong> / ${total}</div><div class="ability-point-grid">${ABILITIES.map(key=>`<div class="ability-point-row"><span>${STAT_NAMES[key]}</span><button type="button" data-stat-minus="${key}" aria-label="Riduci ${STAT_NAMES[key]}" ${builder.statValues[key]<=0?"disabled":""}>−</button><strong>${builder.statValues[key]}</strong><button type="button" data-stat-plus="${key}" aria-label="Aumenta ${STAT_NAMES[key]}" ${builder.remainingPoints<=0||builder.statValues[key]>=18?"disabled":""}>+</button><small>Totale con bonus: ${getBuilderStats()[key]}</small></div>`).join("")}</div><p class="wizard-note">Punti assegnati: ${getAllocatedTotal()} / ${total}. Devi distribuire tutti i punti prima di continuare.</p></div>`;
+  } else if (step === 4) {
     const backgroundSkills = BACKGROUNDS[builder.background].skills;
     const options = CLASS_SKILLS[builder.classId].filter(id => !backgroundSkills.includes(id));
-    content = `<div class="wizard-step"><p class="eyebrow">PASSO 4 DI 6</p><h3>Scegli le abilità</h3><p>Il background concede automaticamente due competenze. Scegli altre <strong>due</strong> abilità tra quelle della tua classe.</p><p class="wizard-note">Competenze del background: ${backgroundSkills.map(id=>SKILLS[id].label).join(", ")}.</p><div class="skill-choice-grid">${options.map(id=>`<label class="skill-choice"><input type="checkbox" data-skill="${id}" ${builder.skills.includes(id)?"checked":""}><span><strong>${SKILLS[id].label}</strong><small>${STAT_NAMES[SKILLS[id].stat]}</small></span></label>`).join("")}</div><p class="wizard-note">Selezionate: ${builder.skills.length} / 2</p></div>`;
-  } else if (step === 4) {
+    content = `<div class="wizard-step"><p class="eyebrow">PASSO 5 DI 7</p><h3>Scegli le abilità</h3><p>Il background concede automaticamente due competenze. Scegli altre <strong>due</strong> abilità tra quelle della tua classe.</p><p class="wizard-note">Competenze del background: ${backgroundSkills.map(id=>SKILLS[id].label).join(", ")}.</p><div class="skill-choice-grid">${options.map(id=>`<label class="skill-choice"><input type="checkbox" data-skill="${id}" ${builder.skills.includes(id)?"checked":""}><span><strong>${SKILLS[id].label}</strong><small>${STAT_NAMES[SKILLS[id].stat]}</small></span></label>`).join("")}</div><p class="wizard-note">Selezionate: ${builder.skills.length} / 2</p></div>`;
+  } else if (step === 5) {
     const spells = SPELLS[builder.classId] || [];
-    content = `<div class="wizard-step"><p class="eyebrow">PASSO 5 DI 6</p><h3>${isCaster()?"Scegli le magie iniziali":"Talenti e capacità"}</h3>${isCaster()? `<p>Seleziona due magie iniziali. Potrai ampliarle durante lo sviluppo del sistema magico.</p><div class="spell-choice-grid">${spells.map(spell=>`<label class="spell-choice"><input type="checkbox" data-spell="${spell.id}" ${builder.spells.includes(spell.id)?"checked":""}><span><strong>${spell.name}</strong><small>${spell.description}</small></span></label>`).join("")}</div><p class="wizard-note">Selezionate: ${builder.spells.length} / 2</p>` : `<p>Questa classe non utilizza magie nel prototipo. Le sue capacità derivano da caratteristiche, abilità ed equipaggiamento.</p>`}</div>`;
+    content = `<div class="wizard-step"><p class="eyebrow">PASSO 6 DI 7</p><h3>${isCaster()?"Scegli le magie iniziali":"Talenti e capacità"}</h3>${isCaster()? `<p>Seleziona due magie iniziali. Potrai ampliarle durante lo sviluppo del sistema magico.</p><div class="spell-choice-grid">${spells.map(spell=>`<label class="spell-choice"><input type="checkbox" data-spell="${spell.id}" ${builder.spells.includes(spell.id)?"checked":""}><span><strong>${spell.name}</strong><small>${spell.description}</small></span></label>`).join("")}</div><p class="wizard-note">Selezionate: ${builder.spells.length} / 2</p>` : "<p>Questa classe non utilizza magie nel prototipo. Le sue capacità derivano da caratteristiche, abilità ed equipaggiamento.</p>"}</div>`;
   } else {
     const stats = getBuilderStats();
-    content = `<div class="wizard-step"><p class="eyebrow">PASSO 6 DI 6</p><h3>Pronto per partire</h3><p>Controlla la scheda a lato. Quando confermi, i valori vengono salvati nella partita e usati da prove e combattimenti.</p><div class="review-list"><p><strong>Discendenza:</strong> ${ANCESTRIES[builder.ancestry].label}</p><p><strong>Classe:</strong> ${CLASS_DATA[builder.classId].label}</p><p><strong>Background:</strong> ${BACKGROUNDS[builder.background].label}</p><p><strong>Caratteristiche:</strong> ${ABILITIES.map(key=>`${STAT_NAMES[key]} ${stats[key]} (${signed(modifier(stats[key]))})`).join(" · ")}</p><p><strong>Abilità scelte:</strong> ${builder.skills.map(id=>SKILLS[id].label).join(", ") || "Nessuna"}</p><p><strong>Magie:</strong> ${builder.spells.map(id=>(SPELLS[builder.classId]||[]).find(spell=>spell.id===id)?.name).filter(Boolean).join(", ") || "Nessuna"}</p></div></div>`;
+    content = `<div class="wizard-step"><p class="eyebrow">PASSO 7 DI 7</p><h3>Pronto per partire</h3><p>Controlla la scheda a lato. Quando confermi, i valori vengono salvati nella partita e usati da prove e combattimenti.</p><div class="review-list"><p><strong>Discendenza:</strong> ${ANCESTRIES[builder.ancestry].label}</p><p><strong>Classe:</strong> ${CLASS_DATA[builder.classId].label}</p><p><strong>Background:</strong> ${BACKGROUNDS[builder.background].label}</p><p><strong>Totale dadi:</strong> ${builder.rolls.reduce((sum,roll)=>sum+roll.score,0)} punti, tutti distribuiti</p><p><strong>Caratteristiche:</strong> ${ABILITIES.map(key=>`${STAT_NAMES[key]} ${stats[key]} (${signed(modifier(stats[key]))})`).join(" · ")}</p><p><strong>Abilità scelte:</strong> ${builder.skills.map(id=>SKILLS[id].label).join(", ") || "Nessuna"}</p><p><strong>Magie:</strong> ${builder.spells.map(id=>(SPELLS[builder.classId]||[]).find(spell=>spell.id===id)?.name).filter(Boolean).join(", ") || "Nessuna"}</p></div></div>`;
   }
-  form.innerHTML = `<div class="wizard-layout"><div class="wizard-main">${content}<div class="wizard-navigation"><button type="button" id="builder-back" class="secondary-button" ${step===0?"disabled":""}>Indietro</button>${step<5?`<button type="button" id="builder-next" class="primary-button">${step===4?"Riepilogo":"Continua"} <span>↗</span></button>`:`<button type="submit" class="primary-button">Comincia il viaggio <span>↗</span></button>`}</div></div><aside class="live-character-sheet">${builderSheetMarkup()}</aside></div>`;
+  form.innerHTML = `<div class="wizard-layout"><div class="wizard-main">${content}<div class="wizard-navigation"><button type="button" id="builder-back" class="secondary-button" ${step===0?"disabled":""}>Indietro</button>${step<6?`<button type="button" id="builder-next" class="primary-button">${step===5?"Riepilogo":"Continua"} <span>↗</span></button>`:`<button type="submit" class="primary-button">Comincia il viaggio <span>↗</span></button>`}</div></div><aside class="live-character-sheet">${builderSheetMarkup()}</aside></div>`;
 }
 function builderValidationMessage() {
-  if (builder.step === 1 && builder.rolls.length !== 6) return "I valori dell’array standard non sono disponibili.";
-  if (builder.step === 2 && (Object.keys(builder.assignment).length !== 6 || new Set(Object.values(builder.assignment)).size !== 6)) return "Assegna tutti e sei i risultati senza ripeterli.";
-  if (builder.step === 3 && builder.skills.length !== 2) return "Scegli esattamente due abilità.";
-  if (builder.step === 4 && isCaster() && builder.spells.length !== 2) return "Scegli esattamente due magie iniziali.";
+  if (builder.step === 2 && builder.rolls.length !== 6) return "Lancia i dadi prima di continuare.";
+  if (builder.step === 3 && (builder.remainingPoints !== 0 || getAllocatedTotal() !== builder.rolls.reduce((sum,roll)=>sum+roll.score,0))) return "Distribuisci tutti i punti ottenuti dai dadi.";
+  if (builder.step === 4 && builder.skills.length !== 2) return "Scegli esattamente due abilità.";
+  if (builder.step === 5 && isCaster() && builder.spells.length !== 2) return "Scegli esattamente due magie iniziali.";
   return "";
 }
 function handleBuilderChange(event) {
   const target = event.target;
   if (target.id === "builder-name") builder.name = target.value;
   if (target.id === "builder-ancestry") builder.ancestry = target.value;
-  if (target.id === "builder-class") {
-    builder.classId = target.value;
-    builder.assignment = getDefaultAssignment(builder.classId);
-    builder.skills = [];
-    builder.spells = [];
-  }
-  if (target.id === "builder-background") { builder.background = target.value; builder.skills = []; }
+  if (target.id === "builder-class") { builder.classId = target.value; builder.skills = []; builder.spells = []; }
+  if (target.name === "builder-background") { builder.background = target.value; builder.skills = []; }
   if (target.id === "builder-mode") builder.mode = target.value;
-  if (target.dataset.ability) {
-    if (target.value === "") delete builder.assignment[target.dataset.ability];
-    else builder.assignment[target.dataset.ability] = Number(target.value);
-  }
   if (target.dataset.skill) {
     const id = target.dataset.skill;
     if (target.checked && builder.skills.length < 2) builder.skills.push(id);
@@ -598,14 +584,23 @@ async function init() {
     }
   });
   el.form.addEventListener("click", event => {
-    if (event.target.closest("#builder-back")) {
-      builder.step = Math.max(0, builder.step - 1);
-      renderBuilder();
+    const target = event.target;
+    if (target.closest("#builder-back")) { builder.step = Math.max(0, builder.step - 1); renderBuilder(); return; }
+    if (target.closest("#roll-ability-dice")) { builder.rolls = rollAbilityScores(); resetStatAllocation(); renderBuilder(); return; }
+    if (target.dataset.statPlus) {
+      const key = target.dataset.statPlus;
+      if (builder.remainingPoints > 0 && builder.statValues[key] < 18) { builder.statValues[key]++; builder.remainingPoints--; renderBuilder(); }
+      return;
     }
-    if (event.target.closest("#builder-next")) {
+    if (target.dataset.statMinus) {
+      const key = target.dataset.statMinus;
+      if (builder.statValues[key] > 0) { builder.statValues[key]--; builder.remainingPoints++; renderBuilder(); }
+      return;
+    }
+    if (target.closest("#builder-next")) {
       const error = builderValidationMessage();
       if (error) { toast(error); return; }
-      builder.step = Math.min(5, builder.step + 1);
+      builder.step = Math.min(6, builder.step + 1);
       renderBuilder();
     }
   });
@@ -613,7 +608,7 @@ async function init() {
     event.preventDefault();
     try {
       const error = builderValidationMessage();
-      if (builder.step !== 5 || error) {
+      if (builder.step !== 6 || error) {
         toast(error || "Completa tutti i passaggi della scheda.");
         return;
       }
