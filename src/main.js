@@ -114,7 +114,7 @@ const SPELLS = {
     { id: "cura_melodica", name: "Cura melodica", description: "Una breve melodia ristora le forze." }
   ]
 };
-const BUILDER_STEPS = ["Identità", "Array standard", "Caratteristiche", "Abilità", "Magie", "Riepilogo"];
+const BUILDER_STEPS = ["Identità", "Background", "Lancio dei dadi", "Caratteristiche", "Abilità", "Magie", "Riepilogo"];
 const builder = {
   step: 0, name: "Il Viandante", classId: "guerriero", ancestry: "umano", background: "forestiero", mode: "standard",
   rolls: STANDARD_ARRAY.map(score => ({ score })), assignment: getDefaultAssignment("guerriero"), skills: [], spells: []
